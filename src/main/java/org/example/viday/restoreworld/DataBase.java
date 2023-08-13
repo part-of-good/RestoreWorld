@@ -28,11 +28,9 @@ public class DataBase {
     }
 
     public void updateBlocks(){
-        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_block WHERE rolled_back = 0 ORDER BY time DESC")) {
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_block WHERE rolled_back = 0 AND time < 1691790003 ORDER BY time DESC")) {
             try(ResultSet result = stmt.executeQuery()){
-                System.out.println("test");
                 while (result.next()){
-                    System.out.println("test1");
                     Location loc = new Location(Bukkit.getWorld(RestoreWorld.getInstance().dataBase.getWorld(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
                     if (RestoreWorld.getInstance().store.checkExists(loc)) continue;
                     RestoreWorld.getInstance().store.addLocation(loc);
@@ -47,11 +45,14 @@ public class DataBase {
                         }
                         meta = String.join(",",data);
                     }
-                    if (result.getString("action").equalsIgnoreCase("1")) block.setBlockData(RestoreWorld.getInstance().getServer().createBlockData(RestoreWorld.getInstance().dataBase.getMaterial(result.getInt("type"))+"["+meta+"]"));
-                    else if (result.getString("action").equalsIgnoreCase("0")) {
-                        block.setType(Material.AIR);
+                    try {
+                        if (result.getString("action").equalsIgnoreCase("1")) block.setBlockData(RestoreWorld.getInstance().getServer().createBlockData(RestoreWorld.getInstance().dataBase.getMaterial(result.getInt("type"))+"["+meta+"]"));
+                        else if (result.getString("action").equalsIgnoreCase("0")) {
+                            block.setType(Material.AIR);
+                        }
+                    } catch (Exception e) {
+                        continue;
                     }
-
                     System.out.println(block.getType().toString() + " | " + block.getX() + " " + block.getY() + " " + block.getZ());
                 }
             } catch (SQLException e) {
