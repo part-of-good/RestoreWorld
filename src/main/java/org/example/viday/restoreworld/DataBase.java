@@ -11,12 +11,16 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.concurrent.CompletableFuture;
+import java.util.HashMap;
 
 public class DataBase {
     public static HikariDataSource hds;
 
     public Connection con;
+
+    private final HashMap<Integer, String> worlds = new HashMap<>();
+    private final HashMap<Integer, String> materials = new HashMap<>();
+    private final HashMap<Integer, String> metadata = new HashMap<>();
 
     public DataBase(HikariConfig config) {
         hds = new HikariDataSource(config);
@@ -30,69 +34,77 @@ public class DataBase {
     public void updateBlocks(){
         try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_block WHERE rolled_back = 0 ORDER BY time DESC")) {
             try(ResultSet result = stmt.executeQuery()){
-                System.out.println("test");
                 while (result.next()){
-                    System.out.println("test1");
-                    Location loc = new Location(Bukkit.getWorld(RestoreWorld.getInstance().dataBase.getWorld(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
+                    Location loc = new Location(Bukkit.getWorld(worlds.get(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
                     if (RestoreWorld.getInstance().store.checkExists(loc)) continue;
-                    RestoreWorld.getInstance().store.addLocation(loc);
+                    System.out.println("test1");
                     Block block = loc.getBlock();
-                    String meta = "";
+                    String meta;
                     if (result.getString("blockdata") != null){
                         result.getString("blockdata").split(",");
                         String[] dataInt = result.getString("blockdata").split(",");
                         String[] data = new String[dataInt.length];
                         for (int i = 0; i < dataInt.length; i++){
-                            data[i] =  RestoreWorld.getInstance().dataBase.getBlockData(Integer.parseInt(dataInt[i]));
+                            data[i] =  metadata.get(Integer.parseInt(dataInt[i]));
                         }
                         meta = String.join(",",data);
+                    } else {
+                        meta = "";
                     }
-                    if (result.getString("action").equalsIgnoreCase("1")) block.setBlockData(RestoreWorld.getInstance().getServer().createBlockData(RestoreWorld.getInstance().dataBase.getMaterial(result.getInt("type"))+"["+meta+"]"));
-                    else if (result.getString("action").equalsIgnoreCase("0")) {
-                        block.setType(Material.AIR);
-                    }
-
-                    System.out.println(block.getType().toString() + " | " + block.getX() + " " + block.getY() + " " + block.getZ());
+                    RestoreWorld.getInstance().getServer().getScheduler().runTask(RestoreWorld.getInstance(), () -> {
+                        try {
+                            if (result.getString("action").equalsIgnoreCase("1"))
+                                block.setBlockData(RestoreWorld.getInstance().getServer().
+                                        createBlockData(materials.get(result.getInt("type"))+"["+meta+"]"));
+                            else if (result.getString("action").equalsIgnoreCase("0"))
+                                block.setType(Material.AIR);
+                            RestoreWorld.getInstance().store.addLocation(loc);
+                        } catch (SQLException e) {
+                            System.out.println("Skiping block "+block.getType() + " at cord " + block.getX() + " " + block.getY() + " " + block.getZ());
+                        }
+                    });
+                    System.out.println(block.getType() + " | " + block.getX() + " " + block.getY() + " " + block.getZ());
                 }
             } catch (SQLException e) {
-                throw new RuntimeException(e);
+                return;
             }
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            return;
         }
         System.out.println("Finish");
     }
 
-    public String getWorld(int id){
-        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_world WHERE id = ?")) {
-            stmt.setInt(1, id);
+    public void getWorlds(){
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_world")) {
             try(ResultSet result = stmt.executeQuery()){
-                return result.getString("world");
+                while (result.next()){
+                    worlds.put(result.getInt("id"), result.getString("world"));
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return null;
     }
 
-    public String getMaterial(int id){
-        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_material_map WHERE id = ?")) {
-            stmt.setInt(1, id);
+    public void getMaterials(){
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_material_map")) {
             try(ResultSet result = stmt.executeQuery()){
-                return result.getString("material");
+                while (result.next()){
+                    materials.put(result.getInt("id"), result.getString("material"));
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return null;
     }
 
 
-    public String getBlockData(int id){
-        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_blockdata_map WHERE id = ?")) {
-            stmt.setInt(1, id);
+    public String getMetadata(){
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_blockdata_map")) {
             try(ResultSet result = stmt.executeQuery()){
-                return result.getString("data");
+                while (result.next()){
+                    metadata.put(result.getInt("id"), result.getString("data"));
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();

@@ -24,7 +24,12 @@ public final class RestoreWorld extends JavaPlugin {
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl("jdbc:sqlite:"+getDataFolder()+"/database.db");
         dataBase = new DataBase(config);
-        dataBase.updateBlocks();
+        dataBase.getWorlds();
+        dataBase.getMetadata();
+        dataBase.getMaterials();
+        CompletableFuture.runAsync(() -> {
+            dataBase.updateBlocks();
+        });
     }
 
 /*    public void updateBlocks() {
