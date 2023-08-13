@@ -35,7 +35,7 @@ public class DataBase {
         try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_block WHERE rolled_back = 0 ORDER BY time DESC")) {
             try(ResultSet result = stmt.executeQuery()){
                 while (result.next()){
-                    Location loc = new Location(Bukkit.getWorld(worlds.get(result.getInt("wid")-1)), result.getInt("x"), result.getInt("y"), result.getInt("z"));
+                    Location loc = new Location(Bukkit.getWorld(worlds.get(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
                     if (RestoreWorld.getInstance().store.checkExists(loc)) continue;
                     System.out.println("test1");
                     Block block = loc.getBlock();
@@ -45,7 +45,7 @@ public class DataBase {
                         String[] dataInt = result.getString("blockdata").split(",");
                         String[] data = new String[dataInt.length];
                         for (int i = 0; i < dataInt.length; i++){
-                            data[i] =  metadata.get(Integer.parseInt(dataInt[i])-1);
+                            data[i] =  metadata.get(Integer.parseInt(dataInt[i]));
                         }
                         meta = String.join(",",data);
                     } else {
@@ -55,7 +55,7 @@ public class DataBase {
                         try {
                             if (result.getString("action").equalsIgnoreCase("1"))
                                 block.setBlockData(RestoreWorld.getInstance().getServer().
-                                        createBlockData(materials.get(result.getInt("type")-1)+"["+meta+"]"));
+                                        createBlockData(materials.get(result.getInt("type"))+"["+meta+"]"));
                             else if (result.getString("action").equalsIgnoreCase("0"))
                                 block.setType(Material.AIR);
                             RestoreWorld.getInstance().store.addLocation(loc);
