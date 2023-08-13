@@ -14,10 +14,6 @@ public class Store {
             restoreWorld.getDataFolder().mkdir();
         }
         final File file = new File(restoreWorld.getDataFolder(), "config.yml");
-        if (!file.exists()) {
-            restoreWorld.getConfig().options().copyDefaults(true);
-            restoreWorld.saveDefaultConfig();
-        }
     }
 
     public boolean checkExists(Location location) {
