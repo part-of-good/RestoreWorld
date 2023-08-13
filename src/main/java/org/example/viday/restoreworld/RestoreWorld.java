@@ -10,7 +10,8 @@ public final class RestoreWorld extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        //Коннкетимся к бд
+        //Коннкетимся к базе данных
+        instance = this;
         try {
             dataBase.connect();
         } catch (SQLException e) {
