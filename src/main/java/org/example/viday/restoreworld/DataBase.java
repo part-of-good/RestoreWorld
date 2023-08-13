@@ -38,7 +38,18 @@ public class DataBase {
     }
 
     public ResultSet getMaterial(int id){
-        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_blockdata_map WHERE id = " + id)) {
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_material_map WHERE id = " + id )) {
+            try(ResultSet result = stmt.executeQuery()){
+                return result;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public ResultSet getBlockData(int id){
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_blockdata_map WHERE id = " + id )) {
             try(ResultSet result = stmt.executeQuery()){
                 return result;
             }
