@@ -1,0 +1,4 @@
+name: RestoreWorld
+version: '1.0-SNAPSHOT'
+main: org.example.viday.restoreworld.RestoreWorld
+api-version: '1.20'
