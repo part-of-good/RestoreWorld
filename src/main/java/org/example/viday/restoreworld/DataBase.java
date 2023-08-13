@@ -35,6 +35,7 @@ public class DataBase {
                     System.out.println("test1");
                     Location loc = new Location(Bukkit.getWorld(RestoreWorld.getInstance().dataBase.getWorld(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
                     if (RestoreWorld.getInstance().store.checkExists(loc)) continue;
+                    RestoreWorld.getInstance().store.addLocation(loc);
                     Block block = loc.getBlock();
                     String meta = "";
                     if (result.getString("blockdata") != null){
@@ -50,7 +51,7 @@ public class DataBase {
                     else if (result.getString("action").equalsIgnoreCase("0")) {
                         block.setType(Material.AIR);
                     }
-                    RestoreWorld.getInstance().store.addLocation(loc);
+
                     RestoreWorld.getInstance().getServer().broadcastMessage(block.getType().toString() + " | " + block.getX() + " " + block.getY() + " " + block.getZ());
                 }
             } catch (SQLException e) {

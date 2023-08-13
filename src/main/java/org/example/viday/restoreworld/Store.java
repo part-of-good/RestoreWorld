@@ -1,10 +1,14 @@
 package org.example.viday.restoreworld;
 
 import org.bukkit.Location;
+import org.bukkit.configuration.InvalidConfigurationException;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 public class Store {
     private final RestoreWorld restoreWorld = RestoreWorld.getInstance();
@@ -17,18 +21,16 @@ public class Store {
     }
 
     public boolean checkExists(Location location) {
-        return restoreWorld.getConfig().getStringList("loc").contains(location.getWorld() + "," + location.getBlockX()
+        return restoreWorld.getConfig().getStringList("Locations").contains(location.getWorld().getName() + "," + location.getBlockX()
                 + "," + location.getBlockY() + "," + location.getBlockZ());
     }
 
     public void addLocation(Location location) {
-        restoreWorld.getConfig().getStringList("loc").add(location.getWorld() + "," + location.getBlockX()
+        List<String> list = restoreWorld.getConfig().getStringList("Locations");
+        list.add(location.getWorld().getName() + "," + location.getBlockX()
                 + "," + location.getBlockY() + "," + location.getBlockZ());
-        try {
-            restoreWorld.getConfig().save(new File("plugins/RestoreWorld/", "config.yml"));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        restoreWorld.getConfig().set("Locations", list);
+        restoreWorld.saveConfig();
     }
 
 }
