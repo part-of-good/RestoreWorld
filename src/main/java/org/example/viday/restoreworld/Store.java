@@ -1,22 +1,21 @@
 package org.example.viday.restoreworld;
 
+import java.io.File;
 import java.util.ArrayList;
-import java.util.List;
 
 public class Store {
-    private final RestoreWorld restoreWorld;
-    private static final List<String> defaultValue = new ArrayList<>();
+    private final RestoreWorld restoreWorld = RestoreWorld.getInstance();
 
-    public Store(RestoreWorld restoreWorld) {
-        this.restoreWorld = restoreWorld;
+    public void loadStore(){
         if (!restoreWorld.getDataFolder().exists()) {
-            restoreWorld.getDataFolder().mkdirs();
+            restoreWorld.getDataFolder().mkdir();
         }
-        restoreWorld.saveConfig();
-
-        if (restoreWorld.getConfig().contains("loc")) {
-            List<String> defaultValue = new ArrayList<>();
-            restoreWorld.getConfig().set("loc", defaultValue);
+        final File file = new File(restoreWorld.getDataFolder(), "config.yml");
+        if (!file.exists()) {
+            restoreWorld.saveDefaultConfig();
+        }
+        if (!restoreWorld.getConfig().contains("loc")) {
+            restoreWorld.getConfig().set("loc", new ArrayList<>());
         }
     }
 
@@ -25,9 +24,7 @@ public class Store {
     }
 
     public void addLocation(int world, int x, int y, int z) {
-        List<String> current = restoreWorld.getConfig().getStringList("loc");
-        current.add(world + "," + x + "," + y + "," + z);
-        restoreWorld.getConfig().set("loc", current);
+        restoreWorld.getConfig().getStringList("loc").add(world + "," + x + "," + y + "," + z);
     }
 
 }
