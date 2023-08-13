@@ -20,9 +20,6 @@ public class DataBase {
         HikariConfig config = new HikariConfig();
         config.setDataSourceClassName("org.sqlite.SQLiteDataSource");
         config.setJdbcUrl("jdbc:sqlite:"+ restoreWorld.getDataFolder() + "/database.db");
-        config.addDataSourceProperty("cachePrepStmts", "true");
-        config.addDataSourceProperty("prepStmtCacheSize", "250");
-        config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
 
         hds = new HikariDataSource(config);
 

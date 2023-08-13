@@ -11,6 +11,7 @@ import java.util.List;
 public final class RestoreWorld extends JavaPlugin {
     private final List<ChuckData> locationDataList = new ArrayList<>();
     private DataBase dataBase = new DataBase(this);
+    private Store store = new Store(this);
     @Override
     public void onEnable() {
         // Получение всех загруженных миров на сервере
