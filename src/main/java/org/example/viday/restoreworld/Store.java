@@ -16,7 +16,7 @@ public class Store {
         if (!file.exists()) {
             restoreWorld.saveDefaultConfig();
         }
-        if (!restoreWorld.getConfig().contains("loc")) {
+        if (restoreWorld.getConfig().getStringList("loc").isEmpty()) {
             restoreWorld.getConfig().set("loc", new ArrayList<>());
         }
     }
