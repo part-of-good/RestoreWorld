@@ -25,6 +25,7 @@ public class DataBase {
     public ResultSet getBlocks(){
         try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_block WHERE rolled_back = 0 ORDER BY time DESC")) {
             try(ResultSet result = stmt.executeQuery()){
+                System.out.println("test");
                 return result;
             }
         } catch (SQLException e) {
