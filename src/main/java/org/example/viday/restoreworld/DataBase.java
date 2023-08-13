@@ -36,4 +36,15 @@ public class DataBase {
         }
         return null;
     }
+
+    public ResultSet getMaterial(int id){
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_blockdata_map WHERE id = " + id)) {
+            try(ResultSet result = stmt.executeQuery()){
+                return result;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 }
