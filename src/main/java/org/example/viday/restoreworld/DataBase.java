@@ -37,10 +37,11 @@ public class DataBase {
         return null;
     }
 
-    public ResultSet getMaterial(int id){
-        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_material_map WHERE id = " + id )) {
+    public String getWorld(int id){
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_world WHERE id = ?")) {
+            stmt.setInt(1, id);
             try(ResultSet result = stmt.executeQuery()){
-                return result;
+                return result.getString("world");
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -48,10 +49,24 @@ public class DataBase {
         return null;
     }
 
-    public ResultSet getBlockData(int id){
-        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_blockdata_map WHERE id = " + id )) {
+    public String getMaterial(int id){
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_material_map WHERE id = ?")) {
+            stmt.setInt(1, id);
             try(ResultSet result = stmt.executeQuery()){
-                return result;
+                return result.getString("material");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+
+    public String getBlockData(int id){
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_blockdata_map WHERE id = ?")) {
+            stmt.setInt(1, id);
+            try(ResultSet result = stmt.executeQuery()){
+                return result.getString("data");
             }
         } catch (SQLException e) {
             e.printStackTrace();
