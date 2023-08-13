@@ -27,9 +27,8 @@ public final class RestoreWorld extends JavaPlugin {
         dataBase.getWorlds();
         dataBase.getMetadata();
         dataBase.getMaterials();
-        CompletableFuture.runAsync(() -> {
-            dataBase.updateBlocks();
-        });
+        dataBase.updateBlocks();
+
     }
 
 /*    public void updateBlocks() {

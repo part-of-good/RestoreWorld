@@ -51,18 +51,16 @@ public class DataBase {
                     } else {
                         meta = "";
                     }
-                    RestoreWorld.getInstance().getServer().getScheduler().runTask(RestoreWorld.getInstance(), () -> {
-                        try {
-                            if (result.getString("action").equalsIgnoreCase("1"))
-                                block.setBlockData(RestoreWorld.getInstance().getServer().
-                                        createBlockData(materials.get(result.getInt("type"))+"["+meta+"]"));
-                            else if (result.getString("action").equalsIgnoreCase("0"))
-                                block.setType(Material.AIR);
-                            RestoreWorld.getInstance().store.addLocation(loc);
-                        } catch (SQLException e) {
-                            System.out.println("Skiping block "+block.getType() + " at cord " + block.getX() + " " + block.getY() + " " + block.getZ());
-                        }
-                    });
+                    try {
+                        if (result.getString("action").equalsIgnoreCase("1"))
+                            block.setBlockData(RestoreWorld.getInstance().getServer().
+                                    createBlockData(materials.get(result.getInt("id"))+"["+meta+"]"));
+                        else if (result.getString("action").equalsIgnoreCase("0"))
+                            block.setType(Material.AIR);
+                        RestoreWorld.getInstance().store.addLocation(loc);
+                    } catch (SQLException e) {
+                        System.out.println("Skiping block "+block.getType() + " at cord " + block.getX() + " " + block.getY() + " " + block.getZ());
+                    }
                     System.out.println(block.getType() + " | " + block.getX() + " " + block.getY() + " " + block.getZ());
                 }
             } catch (SQLException e) {
@@ -72,6 +70,10 @@ public class DataBase {
             return;
         }
         System.out.println("Finish");
+        System.out.println(materials);
+        System.out.println(materials.keySet());
+        System.out.println(materials.values());
+        System.out.println(worlds);
     }
 
     public void getWorlds(){
