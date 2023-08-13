@@ -1,0 +1,4 @@
+name: RestoreWorld
+version: '${project.version}'
+main: org.example.viday.restoreworld.RestoreWorld
+api-version: '1.20'
