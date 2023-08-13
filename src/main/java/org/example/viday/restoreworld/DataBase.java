@@ -52,7 +52,7 @@ public class DataBase {
                         block.setType(Material.AIR);
                     }
 
-                    RestoreWorld.getInstance().getServer().broadcastMessage(block.getType().toString() + " | " + block.getX() + " " + block.getY() + " " + block.getZ());
+                    System.out.println(block.getType().toString() + " | " + block.getX() + " " + block.getY() + " " + block.getZ());
                 }
             } catch (SQLException e) {
                 throw new RuntimeException(e);
