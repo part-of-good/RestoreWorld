@@ -26,7 +26,7 @@ public class DataBase {
         con = hds.getConnection();
     }
 
-    ResultSet getBlocks(){
+    public ResultSet getBlocks(){
         try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_block WHERE rolled_back = 0 ORDER BY time DESC;")) {
             try(ResultSet result = stmt.executeQuery()){
                 return result;
