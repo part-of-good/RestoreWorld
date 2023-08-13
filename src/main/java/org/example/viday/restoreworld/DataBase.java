@@ -10,24 +10,20 @@ import java.sql.SQLException;
 
 public class DataBase {
     public static HikariDataSource hds;
-    private final RestoreWorld restoreWorld;
 
     public Connection con;
 
-    public DataBase(RestoreWorld restoreWorld) {
-        this.restoreWorld = restoreWorld;
-    }
-
-    public void connect() throws SQLException {
-        HikariConfig config = new HikariConfig();
-        config.setDataSourceClassName("org.sqlite.SQLiteDataSource");
-        config.setJdbcUrl("jdbc:sqlite:"+ restoreWorld.getDataFolder() + "/database.db");
+    public DataBase(HikariConfig config) {
         hds = new HikariDataSource(config);
-        con = hds.getConnection();
+        try {
+            con = hds.getConnection();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public ResultSet getBlocks(){
-        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_block WHERE rolled_back = 0 ORDER BY time DESC;")) {
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_block WHERE rolled_back = 0")) {
             try(ResultSet result = stmt.executeQuery()){
                 return result;
             }

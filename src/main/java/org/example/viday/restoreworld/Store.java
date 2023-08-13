@@ -1,5 +1,7 @@
 package org.example.viday.restoreworld;
 
+import org.bukkit.Location;
+
 import java.io.File;
 import java.util.ArrayList;
 
@@ -19,12 +21,14 @@ public class Store {
         }
     }
 
-    public boolean checkExists(int world, int x, int y, int z) {
-        return restoreWorld.getConfig().getStringList("loc").contains(world + "," + x + "," + y + "," + z);
+    public boolean checkExists(Location location) {
+        return restoreWorld.getConfig().getStringList("loc").contains(location.getWorld() + "," + location.getBlockX()
+                + "," + location.getBlockY() + "," + location.getBlockZ());
     }
 
-    public void addLocation(int world, int x, int y, int z) {
-        restoreWorld.getConfig().getStringList("loc").add(world + "," + x + "," + y + "," + z);
+    public void addLocation(Location location) {
+        restoreWorld.getConfig().getStringList("loc").add(location.getWorld() + "," + location.getBlockX()
+                + "," + location.getBlockY() + "," + location.getBlockZ());
     }
 
 }

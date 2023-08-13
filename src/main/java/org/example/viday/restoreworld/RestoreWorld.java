@@ -1,5 +1,6 @@
 package org.example.viday.restoreworld;
 
+import com.zaxxer.hikari.HikariConfig;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
@@ -10,19 +11,19 @@ import java.sql.SQLException;
 import java.util.concurrent.CompletableFuture;
 
 public final class RestoreWorld extends JavaPlugin {
-    private final DataBase dataBase = new DataBase(this);
+    private DataBase dataBase;
+    private Store store;
     private static RestoreWorld instance;
 
     @Override
     public void onEnable() {
         //Коннкетимся к базе данных
         instance = this;
-        try {
-            dataBase.connect();
-            updateBlocks();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
+        store = new Store();
+        store.loadStore();
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl("jdbc:sqlite:"+getDataFolder()+"/database.db");
+        dataBase = new DataBase(config);
         updateBlocks();
     }
 
@@ -30,9 +31,10 @@ public final class RestoreWorld extends JavaPlugin {
         ResultSet result = dataBase.getBlocks();
         CompletableFuture.runAsync(() -> {
             try {
-                if (result.next()){
+                while (result.next()){
                     System.out.println(result);
                     Location loc = new Location(Bukkit.getWorld(dataBase.getWorld(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
+                    if (store.checkExists(loc)) continue;
                     Block block = loc.getBlock();
                     String[] dataInt = result.getString("blockdata").split(",");
                     String[] data = new String[dataInt.length];
@@ -40,6 +42,7 @@ public final class RestoreWorld extends JavaPlugin {
                         data[i] =  dataBase.getBlockData(Integer.parseInt(dataInt[i]));
                     }
                     block.setBlockData(getServer().createBlockData(dataBase.getMaterial(result.getInt("type"))+"["+String.join(",",data)+"]"));
+                    store.addLocation(loc);
                 }
             }
             catch (SQLException e){
