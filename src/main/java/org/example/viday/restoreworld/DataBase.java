@@ -53,7 +53,7 @@ public class DataBase {
                                 continue;
                             }
                             RestoreWorld.getInstance().store.addLocation(loc);
-                            Block block = loc.getBlock();
+                            //Block block = loc.getBlock();
                             String meta = "";
                             if (result.getString("blockdata") != null){
                                 result.getString("blockdata").split(",");
@@ -102,7 +102,7 @@ public class DataBase {
             }
             RestoreWorld.getInstance().getLogger().warning("EXCEPTION!EXCEPTION!EXCEPTION!");
         }
-        if (isFinished) async.cancel();
+        if (isFinished && RestoreWorld.getInstance().blockDataManager.getLocationDataList().size() < 1) async.cancel();
     }
 
     public void updateBlocks(){
