@@ -34,12 +34,12 @@ public class DataBase {
         try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_block WHERE rolled_back = 0 AND time < 1691774000 ORDER BY time DESC")) {
             try(ResultSet result = stmt.executeQuery()){
                 while (result.next()){
-                    String timePrefix = "[" + new SimpleDateFormat("dd MMM yyyy HH:mm").format(new Date(result.getInt("time"))) + "] ";
+                    String timePrefix = "[" + new SimpleDateFormat("dd MMM yyyy HH:mm").format(new Date(result.getInt("time") + "000")) + "] ";
                     String precent = "[" + Math.round(( ((double) count / 62_000_000) * 100 ) * 1e10) / 1e10 + "] ";
 
                     Location loc = new Location(Bukkit.getWorld(RestoreWorld.getInstance().dataBase.getWorld(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
                     if (RestoreWorld.getInstance().store.checkExists(loc)) {
-                        RestoreWorld.getInstance().logger.log(Level.ALL, timePrefix + precent + "SKIP");
+                        System.out.println(timePrefix + precent + "SKIP");
                         continue;
                     }
                     RestoreWorld.getInstance().store.addLocation(loc);
@@ -59,10 +59,10 @@ public class DataBase {
                         else if (result.getString("action").equalsIgnoreCase("0")) {
                             block.setType(Material.AIR);
                         }
-                        RestoreWorld.getInstance().logger.log(Level.ALL, timePrefix + precent + block.getType().toString() + " | " + block.getX() + " " + block.getY() + " " + block.getZ());
+                        System.out.println(timePrefix + precent + block.getType().toString() + " | " + block.getX() + " " + block.getY() + " " + block.getZ());
                         count++;
                     } catch (Exception e) {
-                        RestoreWorld.getInstance().logger.warning(timePrefix + precent + "EXCEPTION");
+                        System.out.println(timePrefix + precent + "EXCEPTION");
                         count++;
                         continue;
                     }

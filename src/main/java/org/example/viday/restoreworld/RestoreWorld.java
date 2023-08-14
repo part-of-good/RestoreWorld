@@ -15,15 +15,12 @@ import java.util.logging.Logger;
 public final class RestoreWorld extends JavaPlugin {
     public DataBase dataBase;
     public Store store;
-    public Logger logger;
     private static RestoreWorld instance;
 
     @Override
     public void onEnable() {
         //Коннкетимся к базе данных
         instance = this;
-        logger = getLogger();
-        logger.log(Level.ALL, "Starting...");
         store = new Store();
         store.loadStore();
         HikariConfig config = new HikariConfig();
