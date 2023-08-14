@@ -34,8 +34,8 @@ public class DataBase {
         try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_block WHERE rolled_back = 0 AND time < 1691774000 ORDER BY time DESC")) {
             try(ResultSet result = stmt.executeQuery()){
                 while (result.next()){
-                    String timePrefix = "[" + new SimpleDateFormat("dd MMM yyyy HH:mm").format(new Date(result.getInt("time") + "000")) + "] ";
-                    String precent = "[" + Math.round(( ((double) count / 62_000_000) * 100 ) * 1e10) / 1e10 + "] ";
+                    String timePrefix = "[" + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong(result.getInt("time") + "000"))) + "] ";
+                    String precent = "[" + Math.round(( ((double) count / 62_000_000) * 100 ) * 1e10) / 1e10 + "%] ";
 
                     Location loc = new Location(Bukkit.getWorld(RestoreWorld.getInstance().dataBase.getWorld(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
                     if (RestoreWorld.getInstance().store.checkExists(loc)) {
