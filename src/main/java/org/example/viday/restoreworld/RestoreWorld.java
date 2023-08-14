@@ -16,6 +16,7 @@ public final class RestoreWorld extends JavaPlugin {
     public DataBase dataBase;
     public Store store;
     private static RestoreWorld instance;
+    public BlockDataManager blockDataManager;
 
     @Override
     public void onEnable() {
@@ -24,26 +25,11 @@ public final class RestoreWorld extends JavaPlugin {
         store = new Store();
         store.loadStore();
         HikariConfig config = new HikariConfig();
+        blockDataManager = new BlockDataManager();
         config.setJdbcUrl("jdbc:sqlite:"+getDataFolder()+"/database.db");
         dataBase = new DataBase(config);
-        dataBase.updateBlocks();
+        dataBase.updateBlocksTest();
     }
-
-/*    public void updateBlocks() {
-        ResultSet result = dataBase.getBlocks();
-        try {
-            System.out.println("test1.5");
-            while (result.next()){
-                System.out.println("test2");
-
-            }
-        }
-        catch (SQLException e){
-            e.printStackTrace();
-        }
-        System.out.println("FINISH!");
-
-    }*/
 
     @Override
     public void onDisable() {
