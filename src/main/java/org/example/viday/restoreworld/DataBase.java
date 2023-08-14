@@ -11,16 +11,15 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.HashMap;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.logging.Level;
 
 public class DataBase {
     public static HikariDataSource hds;
 
     public Connection con;
-
-    private final HashMap<Integer, String> worlds = new HashMap<>();
-    private final HashMap<Integer, String> materials = new HashMap<>();
-    private final HashMap<Integer, String> metadata = new HashMap<>();
+    private long count = 102161;
 
     public DataBase(HikariConfig config) {
         hds = new HikariDataSource(config);
@@ -32,81 +31,81 @@ public class DataBase {
     }
 
     public void updateBlocks(){
-        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_block WHERE rolled_back = 0 ORDER BY time DESC")) {
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_block WHERE rolled_back = 0 AND time < 1691774000 ORDER BY time DESC")) {
             try(ResultSet result = stmt.executeQuery()){
                 while (result.next()){
-                    Location loc = new Location(Bukkit.getWorld(worlds.get(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
-                    if (RestoreWorld.getInstance().store.checkExists(loc)) continue;
-                    System.out.println("test1");
+                    String timePrefix = "[" + new SimpleDateFormat("dd MMM yyyy HH:mm").format(new Date(result.getInt("time"))) + "] ";
+                    String precent = "[" + Math.round(( ((double) count / 62_000_000) * 100 ) * 1e10) / 1e10 + "] ";
+
+                    Location loc = new Location(Bukkit.getWorld(RestoreWorld.getInstance().dataBase.getWorld(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
+                    if (RestoreWorld.getInstance().store.checkExists(loc)) {
+                        RestoreWorld.getInstance().logger.log(Level.ALL, timePrefix + precent + "SKIP");
+                        continue;
+                    }
+                    RestoreWorld.getInstance().store.addLocation(loc);
                     Block block = loc.getBlock();
-                    String meta;
+                    String meta = "";
                     if (result.getString("blockdata") != null){
                         result.getString("blockdata").split(",");
                         String[] dataInt = result.getString("blockdata").split(",");
                         String[] data = new String[dataInt.length];
                         for (int i = 0; i < dataInt.length; i++){
-                            data[i] =  metadata.get(Integer.parseInt(dataInt[i]));
+                            data[i] =  RestoreWorld.getInstance().dataBase.getBlockData(Integer.parseInt(dataInt[i]));
                         }
                         meta = String.join(",",data);
-                    } else {
-                        meta = "";
                     }
                     try {
-                        if (result.getString("action").equalsIgnoreCase("1"))
-                            block.setBlockData(RestoreWorld.getInstance().getServer().
-                                    createBlockData(materials.get(result.getInt("id"))+"["+meta+"]"));
-                        else if (result.getString("action").equalsIgnoreCase("0"))
+                        if (result.getString("action").equalsIgnoreCase("1")) block.setBlockData(RestoreWorld.getInstance().getServer().createBlockData(RestoreWorld.getInstance().dataBase.getMaterial(result.getInt("type"))+"["+meta+"]"));
+                        else if (result.getString("action").equalsIgnoreCase("0")) {
                             block.setType(Material.AIR);
-                        RestoreWorld.getInstance().store.addLocation(loc);
-                    } catch (SQLException e) {
-                        System.out.println("Skiping block "+block.getType() + " at cord " + block.getX() + " " + block.getY() + " " + block.getZ());
+                        }
+                        RestoreWorld.getInstance().logger.log(Level.ALL, timePrefix + precent + block.getType().toString() + " | " + block.getX() + " " + block.getY() + " " + block.getZ());
+                        count++;
+                    } catch (Exception e) {
+                        RestoreWorld.getInstance().logger.warning(timePrefix + precent + "EXCEPTION");
+                        count++;
+                        continue;
                     }
-                    System.out.println(block.getType() + " | " + block.getX() + " " + block.getY() + " " + block.getZ());
                 }
             } catch (SQLException e) {
-                return;
+                throw new RuntimeException(e);
             }
         } catch (SQLException e) {
-            return;
+            throw new RuntimeException(e);
         }
         System.out.println("Finish");
-        System.out.println(materials);
-        System.out.println(materials.keySet());
-        System.out.println(materials.values());
-        System.out.println(worlds);
     }
 
-    public void getWorlds(){
-        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_world")) {
+    public String getWorld(int id){
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_world WHERE id = ?")) {
+            stmt.setInt(1, id);
             try(ResultSet result = stmt.executeQuery()){
-                while (result.next()){
-                    worlds.put(result.getInt("id"), result.getString("world"));
-                }
+                return result.getString("world");
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        return null;
     }
 
-    public void getMaterials(){
-        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_material_map")) {
+    public String getMaterial(int id){
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_material_map WHERE id = ?")) {
+            stmt.setInt(1, id);
             try(ResultSet result = stmt.executeQuery()){
-                while (result.next()){
-                    materials.put(result.getInt("id"), result.getString("material"));
-                }
+                return result.getString("material");
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        return null;
     }
 
 
-    public String getMetadata(){
-        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_blockdata_map")) {
+    public String getBlockData(int id){
+        try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_blockdata_map WHERE id = ?")) {
+            stmt.setInt(1, id);
             try(ResultSet result = stmt.executeQuery()){
-                while (result.next()){
-                    metadata.put(result.getInt("id"), result.getString("data"));
-                }
+                return result.getString("data");
             }
         } catch (SQLException e) {
             e.printStackTrace();
