@@ -9,14 +9,12 @@ public class BlockData {
     private String meta;
     private int action;
     private String strMaterial;
-    private long time;
 
-    public BlockData(Location location, String meta, int action, String strMaterial, long time) {
+    public BlockData(Location location, String meta, int action, String strMaterial) {
         this.location = location;
         this.meta = meta;
         this.action = action;
         this.strMaterial = strMaterial;
-        this.time = time;
     }
 
     public Location getLocation() {
@@ -30,8 +28,5 @@ public class BlockData {
     }
     public String getMaterial() {
         return strMaterial;
-    }
-    public long getTime() {
-        return time;
     }
 }

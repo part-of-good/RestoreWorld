@@ -16,6 +16,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 
 public class DataBase {
     public static HikariDataSource hds;
@@ -25,6 +26,7 @@ public class DataBase {
     private @NotNull BukkitTask async;
     private String timePrefix;
     private String precent;
+    private HashMap<Location, Long> checkTime = new HashMap<>();
 
     public DataBase(HikariConfig config) {
         hds = new HikariDataSource(config);
@@ -64,7 +66,8 @@ public class DataBase {
                                 }
                                 meta = String.join(",",data);
                             }
-                            RestoreWorld.getInstance().blockDataManager.addLocationData(loc, meta, result.getInt("action"), RestoreWorld.getInstance().dataBase.getMaterial(result.getInt("type")), result.getInt("time"));
+                            RestoreWorld.getInstance().blockDataManager.addLocationData(loc, meta, result.getInt("action"), RestoreWorld.getInstance().dataBase.getMaterial(result.getInt("type")));
+                            // checkTime.put(new BlockData(loc, meta, result.getInt("action"), RestoreWorld.getInstance().dataBase.getMaterial(result.getInt("type"))), (long) result.getInt("time"));
                             count++;
 
                         }
@@ -83,22 +86,28 @@ public class DataBase {
     public void setBlock() {
         BlockData blockDataSave = null;
         try {
-            for (BlockData blockData: RestoreWorld.getInstance().blockDataManager.getLocationDataList()) {
+            for (BlockData blockData : RestoreWorld.getInstance().blockDataManager.getLocationDataList()) {
                 blockDataSave = blockData;
                 Location locationData = blockData.getLocation();
+                /*if (checkTime.containsKey(blockData) ) {
+
+                }
+                else {
+                    checkTime.put(blockData, )
+                }*/
                 if (blockData.getAction() == 1) {
                     locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial()+"["+blockData.getMeta()+"]"));
                 }
                 else {
                     locationData.getBlock().setType(Material.AIR);
                 }
-                RestoreWorld.getInstance().blockDataManager.removeBlockData(blockData.getLocation(), blockData.getMeta(), blockData.getAction(), blockData.getMaterial(), blockData.getTime());
+                RestoreWorld.getInstance().blockDataManager.removeBlockData(blockData.getLocation(), blockData.getMeta(), blockData.getAction(), blockData.getMaterial());
                 System.out.println(timePrefix + precent + blockData.getMaterial() + " | " + blockData.getLocation().getBlockX() + " " + blockData.getLocation().getBlockY() + " " + blockData.getLocation().getBlockZ());
             }
         } catch (Exception e) {
             if (blockDataSave != null) {
                 RestoreWorld.getInstance().getLogger().info("Удаление из массива после ошибки");
-                RestoreWorld.getInstance().blockDataManager.removeBlockData(blockDataSave.getLocation(), blockDataSave.getMeta(), blockDataSave.getAction(), blockDataSave.getMaterial(), blockDataSave.getTime());
+                RestoreWorld.getInstance().blockDataManager.removeBlockData(blockDataSave.getLocation(), blockDataSave.getMeta(), blockDataSave.getAction(), blockDataSave.getMaterial());
             }
             RestoreWorld.getInstance().getLogger().warning("EXCEPTION!EXCEPTION!EXCEPTION!");
         }
