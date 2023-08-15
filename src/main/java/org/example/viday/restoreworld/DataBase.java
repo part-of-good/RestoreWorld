@@ -45,12 +45,12 @@ public class DataBase {
             @Override
             public void run() {
                 try {
-                    System.out.println("Формируем запрос...");
-                    //String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time AND t1.time < 1691790003 AND t2.max_time < 1691790003 AND t1.time > 1691096400 AND t2.max_time > 1691096400;";
-                    String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time";
+                    RestoreWorld.getInstance().getLogger().info("Формируем запрос...");
+                    String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time AND t1.time < 1691790003 AND t2.max_time < 1691790003 AND t1.time > 1691096400 AND t2.max_time > 1691096400;";
+                    //String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time";
                     final PreparedStatement stmt = con.prepareStatement(query);
-                    System.out.println("Получили данные!");
                     ResultSet result = stmt.executeQuery();
+                    RestoreWorld.getInstance().getLogger().info("Получили данные!");
                     while (result.next()) {
                         String meta = "";
                         if (result.getString("blockdata") != null) {
@@ -84,14 +84,15 @@ public class DataBase {
 
     public void setBlock(){
         if (!isFinishedQuery) {
-            System.out.println("Ожидание окончание работы бд");
+            RestoreWorld.getInstance().getLogger().info("Ожидание окончание работы бд");
             return;
         }
+        RestoreWorld.getInstance().getLogger().info("Blocks added: " + BlockDataManager.count);
         if (isStartedSetBlock) {
             return;
         }
         isStartedSetBlock = true;
-        System.out.println("Запуск установки блоков");
+        RestoreWorld.getInstance().getLogger().info("Запуск установки блоков");
         new BukkitRunnable() {
             @Override
             public void run() {
@@ -103,10 +104,10 @@ public class DataBase {
                         try {
                             locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial() + "[" + blockData.getMeta() + "]"));
                         } catch (Exception e) {
-                            System.out.println("Установка блока который не имеет BlockData");
+                            RestoreWorld.getInstance().getLogger().info("Установка блока который не имеет BlockData");
                             locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial()));
                         }
-                        System.out.println("[" + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong( blockData.getTime() + "000"))) + "] " +
+                        RestoreWorld.getInstance().getLogger().info("[" + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong( blockData.getTime() + "000"))) + "] " +
                                 "[" + Math.round(( ((double) count / 62_000_000) * 100 ) * 1e10) / 1e10 + "%] " +
                                 blockData.getMaterial() + " " +
                                 blockData.getLocation().getBlockX() + " " +
