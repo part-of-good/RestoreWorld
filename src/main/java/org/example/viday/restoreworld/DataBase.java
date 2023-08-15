@@ -23,7 +23,7 @@ import java.util.List;
 public class DataBase {
     public static HikariDataSource hds;
     public Connection con;
-    private long count = 102161;
+    private long count = 0;
     private @NotNull BukkitTask async;
     private boolean isStartedSetBlock = false;
     private boolean isFinishedQuery = false;
@@ -37,7 +37,7 @@ public class DataBase {
             throw new RuntimeException(e);
         }
         startAsyncQuery();
-        async = Bukkit.getScheduler().runTaskTimer(RestoreWorld.getInstance(), this::setBlock, 0, 1);
+        async = Bukkit.getScheduler().runTaskTimer(RestoreWorld.getInstance(), this::setBlock, 0, 20);
     }
 
     private void startAsyncQuery() {
@@ -46,10 +46,7 @@ public class DataBase {
             public void run() {
                 try {
                     System.out.println("Формируем запрос...");
-                    String query = "SELECT wid, x, y, z, blockdata, time, action, type " +
-                            "FROM co_block " +
-                            "WHERE rolled_back = 0 " +
-                            "ORDER BY wid, x, y, z, time DESC";
+                    String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time AND t1.time < 1691790003 AND t2.max_time < 1691790003 AND t1.time > 1691096400 AND t2.max_time > 1691096400;";
                     final PreparedStatement stmt = con.prepareStatement(query);
                     System.out.println("Получили данные!");
                     ResultSet result = stmt.executeQuery();
@@ -105,7 +102,13 @@ public class DataBase {
                     System.out.println("Установка блока который не имеет BlockData");
                     locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial()));
                 }
-                System.out.println("[" + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong( blockData.getTime() + "000"))) + "] " + blockData.getMaterial() + " " + blockData.getLocation().getBlockX() + " " + blockData.getLocation().getBlockY() + " " + blockData.getLocation().getBlockZ());
+                System.out.println("[" + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong( blockData.getTime() + "000"))) + "] " +
+                        "[" + Math.round(( ((double) count / 62_000_000) * 100 ) * 1e10) / 1e10 + "%] " +
+                        blockData.getMaterial() + " " +
+                        blockData.getLocation().getBlockX() + " " +
+                        blockData.getLocation().getBlockY() + " " +
+                        blockData.getLocation().getBlockZ());
+                count++;
                 iterator.remove();
             } catch (Exception e) {
                 iterator.remove();

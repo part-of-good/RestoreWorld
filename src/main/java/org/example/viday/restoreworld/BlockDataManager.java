@@ -8,9 +8,12 @@ import java.util.List;
 
 public class BlockDataManager {
     private List<BlockData> locationDataList = new ArrayList<>();
+    private int count = 0;
 
     public void addLocationData(Location location, String meta, String strMaterial, long time) {
         locationDataList.add(new BlockData(location, meta, strMaterial, time));
+        count++;
+        RestoreWorld.getInstance().getLogger().info("Blocks added: " + count);
     }
 
     public List<BlockData> getLocationDataList() {
