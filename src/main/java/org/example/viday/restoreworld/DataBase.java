@@ -46,7 +46,8 @@ public class DataBase {
             public void run() {
                 try {
                     System.out.println("Формируем запрос...");
-                    String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time AND t1.time < 1691790003 AND t2.max_time < 1691790003 AND t1.time > 1691096400 AND t2.max_time > 1691096400;";
+                    //String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time AND t1.time < 1691790003 AND t2.max_time < 1691790003 AND t1.time > 1691096400 AND t2.max_time > 1691096400;";
+                    String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time";
                     final PreparedStatement stmt = con.prepareStatement(query);
                     System.out.println("Получили данные!");
                     ResultSet result = stmt.executeQuery();
@@ -91,34 +92,40 @@ public class DataBase {
         }
         isStartedSetBlock = true;
         System.out.println("Запуск установки блоков");
-        Iterator<BlockData> iterator = RestoreWorld.getInstance().blockDataManager.getLocationDataList().iterator();
-        while (iterator.hasNext()) {
-            BlockData blockData = iterator.next();
-            try {
-                Location locationData = blockData.getLocation();
-                try {
-                    locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial() + "[" + blockData.getMeta() + "]"));
-                } catch (Exception e) {
-                    System.out.println("Установка блока который не имеет BlockData");
-                    locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial()));
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                Iterator<BlockData> iterator = RestoreWorld.getInstance().blockDataManager.getLocationDataList().iterator();
+                while (iterator.hasNext()) {
+                    BlockData blockData = iterator.next();
+                    try {
+                        Location locationData = blockData.getLocation();
+                        try {
+                            locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial() + "[" + blockData.getMeta() + "]"));
+                        } catch (Exception e) {
+                            System.out.println("Установка блока который не имеет BlockData");
+                            locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial()));
+                        }
+                        System.out.println("[" + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong( blockData.getTime() + "000"))) + "] " +
+                                "[" + Math.round(( ((double) count / 62_000_000) * 100 ) * 1e10) / 1e10 + "%] " +
+                                blockData.getMaterial() + " " +
+                                blockData.getLocation().getBlockX() + " " +
+                                blockData.getLocation().getBlockY() + " " +
+                                blockData.getLocation().getBlockZ());
+                        count++;
+                        iterator.remove();
+                    } catch (Exception e) {
+                        iterator.remove();
+                        RestoreWorld.getInstance().getLogger().warning("EXCEPTION!EXCEPTION!EXCEPTION!");
+                    }
                 }
-                System.out.println("[" + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong( blockData.getTime() + "000"))) + "] " +
-                        "[" + Math.round(( ((double) count / 62_000_000) * 100 ) * 1e10) / 1e10 + "%] " +
-                        blockData.getMaterial() + " " +
-                        blockData.getLocation().getBlockX() + " " +
-                        blockData.getLocation().getBlockY() + " " +
-                        blockData.getLocation().getBlockZ());
-                count++;
-                iterator.remove();
-            } catch (Exception e) {
-                iterator.remove();
-                RestoreWorld.getInstance().getLogger().warning("EXCEPTION!EXCEPTION!EXCEPTION!");
+                if (RestoreWorld.getInstance().blockDataManager.getLocationDataList().isEmpty()) {
+                    async.cancel();
+                    this.cancel();
+                }
             }
-        }
-        if (RestoreWorld.getInstance().blockDataManager.getLocationDataList().isEmpty()) {
-            async.cancel();
+        }.runTask(RestoreWorld.getInstance());
 
-        }
     }
 
     public String getWorld(int id){
