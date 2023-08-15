@@ -25,18 +25,12 @@ public class DataBase {
     public Connection con;
     private long count = 102161;
     private @NotNull BukkitTask async;
-    private String timePrefix;
-    private String precent;
-    private Store store;
-    private final HashMap<BlockData, Long> checkTime = new HashMap<>();
-    private int sizeToFinish = 0;
     private boolean isStartedSetBlock = false;
     private boolean isFinishedQuery = false;
 
 
-    public DataBase(HikariConfig config, Store store) {
+    public DataBase(HikariConfig config) {
         hds = new HikariDataSource(config);
-        this.store = store;
         try {
             con = hds.getConnection();
         } catch (SQLException e) {
@@ -70,14 +64,17 @@ public class DataBase {
                             }
                             meta = String.join(",", data);
                         }
-
                         // Обработка результатов
                         Location loc = new Location(Bukkit.getWorld(RestoreWorld.getInstance().dataBase.getWorld(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
                         int type = result.getInt("type");
                         int action = result.getInt("action");
-                        RestoreWorld.getInstance().blockDataManager.addLocationData(loc, meta, action, getMaterial(type));
-                        //RestoreWorld.getInstance().blockDataManager.addLocationData(loc, meta, result.getInt("action"), RestoreWorld.getInstance().dataBase.getMaterial(result.getInt("type")));
-
+                        int time = result.getInt("time");
+                        if (action == 1) {
+                            RestoreWorld.getInstance().blockDataManager.addLocationData(loc, meta, getMaterial(type), time);
+                        }
+                        else {
+                            RestoreWorld.getInstance().blockDataManager.addLocationData(loc, meta, "air", time);
+                        }
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -101,13 +98,14 @@ public class DataBase {
         while (iterator.hasNext()) {
             BlockData blockData = iterator.next();
             try {
-                System.out.println(blockData.getMaterial() + " " + blockData.getAction() + " " + blockData.getLocation().getBlockX() + " " + blockData.getLocation().getBlockY() + " " + blockData.getLocation().getBlockZ());
                 Location locationData = blockData.getLocation();
-                if (blockData.getAction() == 1) {
+                try {
                     locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial() + "[" + blockData.getMeta() + "]"));
-                } else {
-                    locationData.getBlock().setType(Material.AIR);
+                } catch (Exception e) {
+                    System.out.println("Установка блока который не имеет BlockData");
+                    locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial()));
                 }
+                System.out.println("[" + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong( blockData.getTime() + "000"))) + "] " + blockData.getMaterial() + " " + blockData.getLocation().getBlockX() + " " + blockData.getLocation().getBlockY() + " " + blockData.getLocation().getBlockZ());
                 iterator.remove();
             } catch (Exception e) {
                 iterator.remove();

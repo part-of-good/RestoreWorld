@@ -28,7 +28,6 @@ public final class RestoreWorld extends JavaPlugin {
         blockDataManager = new BlockDataManager();
         config.setJdbcUrl("jdbc:sqlite:"+getDataFolder()+"/database.db");
         dataBase = new DataBase(config);
-        dataBase.updateBlocksTest();
     }
 
     @Override
