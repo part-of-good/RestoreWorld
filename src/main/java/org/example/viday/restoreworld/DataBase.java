@@ -131,40 +131,40 @@ public class DataBase {
         }
         isStartedSetBlock = true;
         RestoreWorld.getInstance().getLogger().info("Запуск установки блоков");
-                // int i = 0; // раскомитить если асинхронно
-                Iterator<BlockData> iterator = RestoreWorld.getInstance().blockDataManager.getLocationDataList().iterator();
-                while (!RestoreWorld.getInstance().blockDataManager.getLocationDataList().isEmpty() /*&& i < 500*/) {
-                    // i++;
-                    BlockData blockData = iterator.next();
-                    try {
-                        Location locationData = blockData.getLocation();
-                        try {
-                            locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial() + "[" + blockData.getMeta() + "]"));
-                        } catch (Exception e) {
-                            RestoreWorld.getInstance().getLogger().info("Установка блока который не имеет BlockData");
-                            locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial()));
-                        }
-                        RestoreWorld.getInstance().getLogger().info("[" + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong( blockData.getTime() + "000"))) + "] " +
-                                "шаг " + currentStep + " [" + Math.round(( ((double) count / 62_000_000) * 100 ) * 1e10) / 1e10 + "%] " +
-                                blockData.getMaterial() + " " +
-                                blockData.getLocation().getBlockX() + " " +
-                                blockData.getLocation().getBlockY() + " " +
-                                blockData.getLocation().getBlockZ());
-                        count++;
-                        iterator.remove();
-                    } catch (Exception e) {
-                        iterator.remove();
-                        RestoreWorld.getInstance().getLogger().warning("EXCEPTION!EXCEPTION!EXCEPTION!");
-                    }
+        // int i = 0; // раскомитить если асинхронно
+        Iterator<BlockData> iterator = RestoreWorld.getInstance().blockDataManager.getLocationDataList().iterator();
+        while (!RestoreWorld.getInstance().blockDataManager.getLocationDataList().isEmpty() /*&& i < 500*/) {
+            // i++;
+            BlockData blockData = iterator.next();
+            try {
+                Location locationData = blockData.getLocation();
+                try {
+                    locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial() + "[" + blockData.getMeta() + "]"));
+                } catch (Exception e) {
+                    RestoreWorld.getInstance().getLogger().info("Установка блока который не имеет BlockData");
+                    locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial()));
                 }
-                if (RestoreWorld.getInstance().blockDataManager.getLocationDataList().isEmpty()) {
-                    System.out.println("Finish! шаг " + currentStep);
-                    startAsyncQuery();
-                }
-                if (isFinishedStep) {
-                    asyncSetBlock.cancel();     // если мы все шаги прошли, то стопаем запуск треда
-                }
-                isStartedSetBlock = false;
+                RestoreWorld.getInstance().getLogger().info("[" + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong( blockData.getTime() + "000"))) + "] " +
+                        "шаг " + currentStep + " [" + Math.round(( ((double) count / 62_000_000) * 100 ) * 1e10) / 1e10 + "%] " +
+                        blockData.getMaterial() + " " +
+                        blockData.getLocation().getBlockX() + " " +
+                        blockData.getLocation().getBlockY() + " " +
+                        blockData.getLocation().getBlockZ());
+                count++;
+                iterator.remove();
+            } catch (Exception e) {
+                iterator.remove();
+                RestoreWorld.getInstance().getLogger().warning("EXCEPTION!EXCEPTION!EXCEPTION!");
+            }
+        }
+        if (RestoreWorld.getInstance().blockDataManager.getLocationDataList().isEmpty()) {
+            System.out.println("Finish! шаг " + currentStep);
+            startAsyncQuery();
+        }
+        if (isFinishedStep) {
+            asyncSetBlock.cancel();     // если мы все шаги прошли, то стопаем запуск треда
+        }
+        isStartedSetBlock = false;
     }
 
     public void setItemContainer() {
@@ -200,31 +200,34 @@ public class DataBase {
                 int z = result.getInt("z");
                 Location location = new Location(Bukkit.getWorld(getWorld(wid)), x ,y ,z);
                 Material blockMaterialContainer = location.getBlock().getType();
-                // все что ниже ваще не нравится ни как, а по другому приведение типов ни как не сделать
                 try {
-                    if (blockMaterialContainer == Material.CHEST || blockMaterialContainer == Material.TRAPPED_CHEST) {
-                        Chest chest = (Chest) location.getBlock().getState();
-                        chest.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
-                    }
-                    else if (blockMaterialContainer == Material.DISPENSER) {
-                        Dispenser dispenser = (Dispenser) location.getBlock().getState();
-                        dispenser.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
-                    }
-                    else if (blockMaterialContainer == Material.DROPPER) {
-                        Dropper dropper = (Dropper) location.getBlock().getState();
-                        dropper.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
-                    }
-                    else if (blockMaterialContainer == Material.HOPPER) {
-                        Hopper hopper = (Hopper) location.getBlock().getState();
-                        hopper.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
-                    }
-                    else if (blockMaterialContainer == Material.BARREL) {
-                        Barrel barrel = (Barrel) location.getBlock().getState();
-                        barrel.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
-                    }
-                    else if (location.getBlock().getState() instanceof ShulkerBox) {
-                        ShulkerBox shulkerBox = (ShulkerBox) location.getBlock().getState();
-                        shulkerBox.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
+                    switch (blockMaterialContainer) {
+                        case CHEST, TRAPPED_CHEST -> {
+                            Chest chest = (Chest) location.getBlock().getState();
+                            chest.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
+                        }
+                        case DISPENSER -> {
+                            Dispenser dispenser = (Dispenser) location.getBlock().getState();
+                            dispenser.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
+                        }
+                        case DROPPER -> {
+                            Dropper dropper = (Dropper) location.getBlock().getState();
+                            dropper.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
+                        }
+                        case HOPPER -> {
+                            Hopper hopper = (Hopper) location.getBlock().getState();
+                            hopper.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
+                        }
+                        case BARREL -> {
+                            Barrel barrel = (Barrel) location.getBlock().getState();
+                            barrel.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
+                        }
+                        default -> {
+                            if (location.getBlock().getState() instanceof ShulkerBox) {
+                                ShulkerBox shulkerBox = (ShulkerBox) location.getBlock().getState();
+                                shulkerBox.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
+                            }
+                        }
                     }
                 } catch (Exception e) {
                     System.out.println("Не удалось получить инвентарь " + blockMaterialContainer);
