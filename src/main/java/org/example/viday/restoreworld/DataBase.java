@@ -4,6 +4,9 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.block.*;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
@@ -20,16 +23,19 @@ public class DataBase {
     public static HikariDataSource hds;
     public Connection con;
     private long count = 0;
-    private @NotNull BukkitTask async;
+    private @NotNull BukkitTask asyncSetBlock;
+    private @NotNull BukkitTask asyncSetItem;
     private boolean isStartedSetBlock = false;
     private boolean isFinishedQuery = false;
     private boolean isFinishedStep = false;
-    private long minTimeMS = 1;     // МЕНЯТЬ старт по времени (тут у нас указывается минимальное значение отсчета) пример: 1.08.2023
-    private long maxTimeMS = 0;     // НЕ МЕНЯТЬ максимальный по времени шаг (тут указывается максимальное значение времени) пример: 8.08.2023
-    private int amountStepMS = 604800000;   // размер шага в ms (указанное значение это 7 дней)
-    private int amountMaxStep = 8;  // кол-во шагов
+    private boolean isFinishedSetAllBlock = false;
+    private boolean isStartedSetItem = false;
+    private long minTimeMS = 1692032400;     // МЕНЯТЬ старт по времени (тут у нас указывается минимальное значение отсчета) пример: 1.08.2023
+    private long maxTimeMS = 1699032400;     // МЕНЯТЬ максимальный по времени шаг (тут указывается максимальное значение времени) пример: 8.08.2023
+    private final int amountStepMS = 604800000;   // размер шага в ms (указанное значение это 7 дней)
+    private final int maxStep = 8;  // кол-во шагов
     private int currentStep = 0;    // кол-во текущих шагов (для конфига и тайм стопа)
-    private long maxTimeStepMS = 1691790003; // максимум по времени до которого мы можем дойти (11 августа)
+    private final long maxTimeStepMS = 1791790003; // максимум по времени до которого мы можем дойти (11 августа - 1691790003)
 
 
     public DataBase(HikariConfig config) {
@@ -40,14 +46,15 @@ public class DataBase {
             throw new RuntimeException(e);
         }
         startAsyncQuery();
-        async = Bukkit.getScheduler().runTaskTimer(RestoreWorld.getInstance(), this::setBlock, 0, 20);
+        asyncSetBlock = Bukkit.getScheduler().runTaskTimer(RestoreWorld.getInstance(), this::setBlock, 0, 20);
+        asyncSetItem = Bukkit.getScheduler().runTaskTimer(RestoreWorld.getInstance(), this::setItemContainer, 0, 20);
     }
 
     private void startAsyncQuery() {
-        if (currentStep < amountMaxStep) {
+        if (currentStep < maxStep) {
             if (currentStep != 0) {
                 minTimeMS += amountStepMS;              // 0 + 7 = 7
-                maxTimeMS = minTimeMS + amountMaxStep;  // 7 + 7 = 14 (для соблюдения интервала)
+                maxTimeMS = minTimeMS + maxStep;  // 7 + 7 = 14 (для соблюдения интервала)
             }
             if (maxTimeMS > maxTimeStepMS) {
                 maxTimeMS = maxTimeStepMS;  // если мы превышаем максимальное значение, то присваиваем максимальное
@@ -55,14 +62,17 @@ public class DataBase {
             if (minTimeMS > maxTimeStepMS) {
                 minTimeMS = maxTimeStepMS;  // тоже самое что и выше
             }
-            if (minTimeMS == maxTimeStepMS && maxTimeMS == maxTimeStepMS) {
-                currentStep = amountMaxStep;
+            // типо работает, наверное, но почему то превышаю лимит, мб данных мало
+            /*if (minTimeMS == maxTimeStepMS && maxTimeMS == maxTimeStepMS) {
+                currentStep = maxStep;
                 isFinishedStep = true;
+                isFinishedSetAllBlock = true;
                 System.out.println("FINISH! (Кол-во шагов превышают максимальный лимит по времени)");
-            }
+            }*/
             currentStep++;
         }
         else {
+            isFinishedSetAllBlock = true;
             isFinishedStep = true;
         }
         new BukkitRunnable() {
@@ -121,9 +131,6 @@ public class DataBase {
         }
         isStartedSetBlock = true;
         RestoreWorld.getInstance().getLogger().info("Запуск установки блоков");
-        new BukkitRunnable() {
-            @Override
-            public void run() {
                 // int i = 0; // раскомитить если асинхронно
                 Iterator<BlockData> iterator = RestoreWorld.getInstance().blockDataManager.getLocationDataList().iterator();
                 while (!RestoreWorld.getInstance().blockDataManager.getLocationDataList().isEmpty() /*&& i < 500*/) {
@@ -152,41 +159,89 @@ public class DataBase {
                 }
                 if (RestoreWorld.getInstance().blockDataManager.getLocationDataList().isEmpty()) {
                     System.out.println("Finish! шаг " + currentStep);
-                    this.cancel();
                     startAsyncQuery();
                 }
                 if (isFinishedStep) {
-                    async.cancel();     // если мы все шаги прошли, то стопаем запуск треда
+                    asyncSetBlock.cancel();     // если мы все шаги прошли, то стопаем запуск треда
                 }
                 isStartedSetBlock = false;
-                this.cancel();
-            }
-        }.runTask(RestoreWorld.getInstance());
     }
-    // co_block:
-    // action 0 - air, пусто
-    // action 1 - block, поставлен но не было взаимодействий
-    // action 2 - block, были взаимодействия (например открытие)
+
     public void setItemContainer() {
-        String query = "SELECT t1.* " +
-                "FROM co_block t1 " +
-                "JOIN (" +
+        // Мы должны брать сундук с актион 1, т.к. это значит, что в сундуке что-то есть
+        // Так же, мы должны сортировать контейнера по времени и параметрам wid, x, y, z, type, где type выступает содержимым контейнера (amount кол-во этого предмета)
+        // То есть могут быть 10 одинаковых координат, но иметь разное содержимое
+        if (!isFinishedSetAllBlock) {
+            System.out.println("Ждем установки всех блоков");
+            return;
+        }
+        if (isStartedSetItem) {
+            return;
+        }
+        isStartedSetItem = true;
+        String query = "SELECT * " +
+                "FROM co_container " +
+                "WHERE action = 1 " +
+                "AND (wid, x, y, z, type, time) IN (" +
                 "SELECT wid, x, y, z, type, MAX(time) AS max_time " +
-                "FROM co_block " +
-                "WHERE rolled_back = 0 " +
-                "GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time AND t1.time < " + maxTimeMS + " AND t2.max_time < " + maxTimeMS + " AND t1.time > " + minTimeMS + " AND t2.max_time > " + minTimeMS;
+                "FROM co_container " +
+                "WHERE action = 1 AND time < " + maxTimeStepMS + " " +
+                "GROUP BY wid, x, y, z, type " +
+                ")";
         try {
-            // Мы должны брать сундук с актион 1, т.к. это значит, что в сундуке что-то есть
-            // Так же, мы должны сортировать контейнера по времени и параметрам wid, x, y, z, type, где type выступает содержимым контейнера (amount кол-во этого предмета)
-            // То есть могут быть 10 одинаковых координат, но иметь разное содержимое
             final PreparedStatement stmt = con.prepareStatement(query);
             ResultSet result = stmt.executeQuery();
             while (result.next()) {
-
+                int type = result.getInt("type");
+                int amount = result.getInt("amount");
+                int wid = result.getInt("wid");
+                int x = result.getInt("x");
+                int y = result.getInt("y");
+                int z = result.getInt("z");
+                Location location = new Location(Bukkit.getWorld(getWorld(wid)), x ,y ,z);
+                Material blockMaterialContainer = location.getBlock().getType();
+                // все что ниже ваще не нравится ни как, а по другому приведение типов ни как не сделать
+                try {
+                    if (blockMaterialContainer == Material.CHEST || blockMaterialContainer == Material.TRAPPED_CHEST) {
+                        Chest chest = (Chest) location.getBlock().getState();
+                        chest.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
+                    }
+                    else if (blockMaterialContainer == Material.DISPENSER) {
+                        Dispenser dispenser = (Dispenser) location.getBlock().getState();
+                        dispenser.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
+                    }
+                    else if (blockMaterialContainer == Material.DROPPER) {
+                        Dropper dropper = (Dropper) location.getBlock().getState();
+                        dropper.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
+                    }
+                    else if (blockMaterialContainer == Material.HOPPER) {
+                        Hopper hopper = (Hopper) location.getBlock().getState();
+                        hopper.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
+                    }
+                    else if (blockMaterialContainer == Material.BARREL) {
+                        Barrel barrel = (Barrel) location.getBlock().getState();
+                        barrel.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
+                    }
+                    else if (location.getBlock().getState() instanceof ShulkerBox) {
+                        ShulkerBox shulkerBox = (ShulkerBox) location.getBlock().getState();
+                        shulkerBox.getInventory().addItem(getItem(Material.matchMaterial(getMaterial(type)), amount));
+                    }
+                } catch (Exception e) {
+                    System.out.println("Не удалось получить инвентарь " + blockMaterialContainer);
+                    e.printStackTrace();
+                }
             }
         } catch (Exception e) {
             RestoreWorld.getInstance().getLogger().warning("EXCEPTION CONTAINER!");
         }
+        System.out.println("FINALLY FINISH!");
+        asyncSetItem.cancel();
+    }
+
+    public ItemStack getItem(Material material, int amount) {
+        ItemStack itemStack = new ItemStack(material);  // Получаем итем стак материала
+        itemStack.setAmount(amount);                    // Кол-во предметов
+        return itemStack;
     }
 
     public String getWorld(int id){
