@@ -94,7 +94,7 @@ public class DataBase {
                         int type = result.getInt("type");
                         int action = result.getInt("action");
                         int time = result.getInt("time");
-                        if (action == 1) {
+                        if (action >= 1) {
                             RestoreWorld.getInstance().blockDataManager.addLocationData(loc, meta, getMaterial(type), time);
                         }
                         else {
@@ -162,7 +162,31 @@ public class DataBase {
                 this.cancel();
             }
         }.runTask(RestoreWorld.getInstance());
+    }
+    // co_block:
+    // action 0 - air, пусто
+    // action 1 - block, поставлен но не было взаимодействий
+    // action 2 - block, были взаимодействия (например открытие)
+    public void setItemContainer() {
+        String query = "SELECT t1.* " +
+                "FROM co_block t1 " +
+                "JOIN (" +
+                "SELECT wid, x, y, z, type, MAX(time) AS max_time " +
+                "FROM co_block " +
+                "WHERE rolled_back = 0 " +
+                "GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time AND t1.time < " + maxTimeMS + " AND t2.max_time < " + maxTimeMS + " AND t1.time > " + minTimeMS + " AND t2.max_time > " + minTimeMS;
+        try {
+            // Мы должны брать сундук с актион 1, т.к. это значит, что в сундуке что-то есть
+            // Так же, мы должны сортировать контейнера по времени и параметрам wid, x, y, z, type, где type выступает содержимым контейнера (amount кол-во этого предмета)
+            // То есть могут быть 10 одинаковых координат, но иметь разное содержимое
+            final PreparedStatement stmt = con.prepareStatement(query);
+            ResultSet result = stmt.executeQuery();
+            while (result.next()) {
 
+            }
+        } catch (Exception e) {
+            RestoreWorld.getInstance().getLogger().warning("EXCEPTION CONTAINER!");
+        }
     }
 
     public String getWorld(int id){
