@@ -124,10 +124,10 @@ public class DataBase {
         new BukkitRunnable() {
             @Override
             public void run() {
-                int i = 0;
+                // int i = 0; // раскомитить если асинхронно
                 Iterator<BlockData> iterator = RestoreWorld.getInstance().blockDataManager.getLocationDataList().iterator();
-                while (!RestoreWorld.getInstance().blockDataManager.getLocationDataList().isEmpty() && i < 500) {
-                    i++;
+                while (!RestoreWorld.getInstance().blockDataManager.getLocationDataList().isEmpty() /*&& i < 500*/) {
+                    // i++;
                     BlockData blockData = iterator.next();
                     try {
                         Location locationData = blockData.getLocation();
