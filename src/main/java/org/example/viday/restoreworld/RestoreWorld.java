@@ -26,7 +26,7 @@ public final class RestoreWorld extends JavaPlugin {
         store.loadStore();
         HikariConfig config = new HikariConfig();
         blockDataManager = new BlockDataManager();
-        config.setJdbcUrl("jdbc:sqlite:"+getDataFolder()+"/database.db");
+        config.setJdbcUrl("jdbc:sqlite:" + getDataFolder() + "/database.db");
         dataBase = new DataBase(config);
     }
 
