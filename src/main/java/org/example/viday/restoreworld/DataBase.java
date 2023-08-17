@@ -16,20 +16,16 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 
 public class DataBase {
     public static HikariDataSource hds;
     public Connection con;
     private long count = 0;
-    private @NotNull BukkitTask asyncSetBlock;
-    private @NotNull BukkitTask asyncSetItem;
-    private boolean isStartedSetBlock = false;
-    private boolean isFinishedQuery = false;
-    private boolean isFinishedStep = false;
-    private boolean isFinishedSetAllBlock = false;
-    private boolean isStartedSetItem = false;
+    StringBuilder stringMaterialID = new StringBuilder();
     private long minTimeMS = 1692032400;     // МЕНЯТЬ старт по времени (тут у нас указывается минимальное значение отсчета) пример: 1.08.2023
     private long maxTimeMS = 1699032400;     // МЕНЯТЬ максимальный по времени шаг (тут указывается максимальное значение времени) пример: 8.08.2023
     private final int amountStepMS = 604800000;   // размер шага в ms (указанное значение это 7 дней)
@@ -45,16 +41,16 @@ public class DataBase {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
+        getContainerMaterial(); // Сундуки, хоперы и т.д.
+        getContainerBlock();    // после мы вносим корды и состояние контейнеров
         startAsyncQuery();
-        asyncSetBlock = Bukkit.getScheduler().runTaskTimer(RestoreWorld.getInstance(), this::setBlock, 0, 20);
-        asyncSetItem = Bukkit.getScheduler().runTaskTimer(RestoreWorld.getInstance(), this::setItemContainer, 0, 20);
     }
 
     private void startAsyncQuery() {
         if (currentStep < maxStep) {
             if (currentStep != 0) {
-                minTimeMS += amountStepMS;              // 0 + 7 = 7
-                maxTimeMS = minTimeMS + maxStep;  // 7 + 7 = 14 (для соблюдения интервала)
+                minTimeMS += amountStepMS;      // 0 + 7 = 7
+                maxTimeMS = minTimeMS + maxStep;// 7 + 7 = 14 (для соблюдения интервала)
             }
             if (maxTimeMS > maxTimeStepMS) {
                 maxTimeMS = maxTimeStepMS;  // если мы превышаем максимальное значение, то присваиваем максимальное
@@ -72,64 +68,114 @@ public class DataBase {
             currentStep++;
         }
         else {
-            isFinishedSetAllBlock = true;
-            isFinishedStep = true;
+            setItemContainer();
+            return;
         }
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                try {
-                    RestoreWorld.getInstance().getLogger().info("Формируем запрос...");
-                    RestoreWorld.getInstance().getLogger().info("Интервал запроса от " + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong( minTimeMS + "000"))) +
-                            " до " + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong( maxTimeMS + "000"))) + " текущий шаг " + currentStep);
-                    String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time AND t1.time < " + maxTimeMS + " AND t2.max_time < " + maxTimeMS + " AND t1.time > " + minTimeMS + " AND t2.max_time > " + minTimeMS;
-                    //String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time AND t1.time < 1691790003 AND t2.max_time < 1691790003 AND t1.time > 1691096400 AND t2.max_time > 1691096400;";
-                    //String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time";
-                    final PreparedStatement stmt = con.prepareStatement(query);
-                    ResultSet result = stmt.executeQuery();
-                    RestoreWorld.getInstance().getLogger().info("Получили данные!");
-                    while (result.next()) {
-                        String meta = "";
-                        if (result.getString("blockdata") != null) {
-                            result.getString("blockdata").split(",");
-                            String[] dataInt = result.getString("blockdata").split(",");
-                            String[] data = new String[dataInt.length];
-                            for (int i = 0; i < dataInt.length; i++) {
-                                data[i] = RestoreWorld.getInstance().dataBase.getBlockData(Integer.parseInt(dataInt[i]));
-                            }
-                            meta = String.join(",", data);
-                        }
-                        // Обработка результатов
-                        Location loc = new Location(Bukkit.getWorld(RestoreWorld.getInstance().dataBase.getWorld(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
-                        int type = result.getInt("type");
-                        int action = result.getInt("action");
-                        int time = result.getInt("time");
-                        if (action >= 1) {
-                            RestoreWorld.getInstance().blockDataManager.addLocationData(loc, meta, getMaterial(type), time);
-                        }
-                        else {
-                            RestoreWorld.getInstance().blockDataManager.addLocationData(loc, meta, "air", time);
-                        }
+        try {
+            RestoreWorld.getInstance().getLogger().info("Формируем запрос...");
+            RestoreWorld.getInstance().getLogger().info("Интервал запроса от " + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong( minTimeMS + "000"))) +
+                    " до " + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong( maxTimeMS + "000"))) + " текущий шаг " + currentStep);
+            String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time " +
+                    "FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid " +
+                    "AND t1.x = t2.x " +
+                    "AND t1.y = t2.y " +
+                    "AND t1.z = t2.z " +
+                    "AND t1.time = t2.max_time " +
+                    "AND t1.time < " + maxTimeMS + " " +
+                    "AND t2.max_time < " + maxTimeMS + " " +
+                    "AND t1.time > " + minTimeMS + " " +
+                    "AND t2.max_time > " + minTimeMS + " " +
+                    "WHERE t1.type NOT IN (" + stringMaterialID + ")";
+
+            //String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time AND t1.time < 1691790003 AND t2.max_time < 1691790003 AND t1.time > 1691096400 AND t2.max_time > 1691096400;";
+            //String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time";
+            PreparedStatement stmt = con.prepareStatement(query);
+            ResultSet result = stmt.executeQuery();
+            RestoreWorld.getInstance().getLogger().info("Получили данные!");
+            while (result.next()) {
+                String meta = "";
+                if (result.getString("blockdata") != null) {
+                    result.getString("blockdata").split(",");
+                    String[] dataInt = result.getString("blockdata").split(",");
+                    String[] data = new String[dataInt.length];
+                    for (int i = 0; i < dataInt.length; i++) {
+                        data[i] = getBlockData(Integer.parseInt(dataInt[i]));
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
+                    meta = String.join(",", data);
                 }
-                isFinishedQuery = true;
-                this.cancel();
+                // Обработка результатов
+                Location loc = new Location(Bukkit.getWorld(RestoreWorld.getInstance().dataBase.getWorld(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
+                int type = result.getInt("type");
+                int action = result.getInt("action");
+                int time = result.getInt("time");
+                if (action >= 1) {
+                    RestoreWorld.getInstance().blockDataManager.addLocationData(loc, meta, getMaterial(type), time);
+                }
+                else {
+                    RestoreWorld.getInstance().blockDataManager.addLocationData(loc, meta, "air", time);
+                }
             }
-        }.runTask(RestoreWorld.getInstance()); //runTaskAsynchronously(RestoreWorld.getInstance());
+            RestoreWorld.getInstance().getLogger().info("Blocks added: " + BlockDataManager.count);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        // Удаление контейнеров если они более не актуальны
+        System.out.println("Удаление не актуальных контейнеров");
+        for (BlockData blockData : RestoreWorld.getInstance().blockDataManager.getLocationDataList()) {
+            for (ContainerData containerData : RestoreWorld.getInstance().containerDataManager.getContainerDataList()) {
+                if (blockData.getLocation().equals(containerData.getLocation())) {
+                    System.out.println("Совпадение по Location: " + blockData.getLocation());
+                    RestoreWorld.getInstance().containerDataManager.removeContainerData(containerData.getLocation(), containerData.getMeta(), containerData.getMaterial());
+                }
+            }
+        }
+        setBlock();
+    }
+    public void getContainerBlock() {
+        // Мы должны получить все id материалов контейнеров, после по полученным значениям мы делаем запрос в бд
+        // где получаем все блоки с id, после сортируем их по времени и после оставляем те, у кого есть blockdata
+        // Получить wid, x, y, z где type chestID, barrelID (и т.д.), blockdata != 0, далее, если совпадают все значения, то берем где времени больше всего
+        // далее мы вносим эти значения в список (новый манагер для контейнеров)
+        // В основном запросе игнорируем все контейнера и расставляем как есть
+        try {
+            String queryContainer = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time " +
+                    "FROM co_block WHERE rolled_back = 0 AND blockdata IS NOT NULL GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid " +
+                    "AND t1.x = t2.x " +
+                    "AND t1.y = t2.y " +
+                    "AND t1.z = t2.z " +
+                    "AND t1.time = t2.max_time " +
+                    "AND t1.time < " + maxTimeStepMS + " " +
+                    "AND t2.max_time < " + maxTimeStepMS + " " +
+                    "WHERE t1.type IN (" + stringMaterialID + ")";
+            PreparedStatement statementContainer = con.prepareStatement(queryContainer);
+            ResultSet resultContainer = statementContainer.executeQuery();
+            while (resultContainer.next()) {
+                try {
+                    resultContainer.getString("blockdata").split(",");
+                    String[] dataInt = resultContainer.getString("blockdata").split(",");
+                    String[] data = new String[dataInt.length];
+                    for (int i = 0; i < dataInt.length; i++) {
+                        data[i] = getBlockData(Integer.parseInt(dataInt[i]));
+                    }
+                    String meta = String.join(",", data);
+                    int type = resultContainer.getInt("type");
+                    Location location = new Location(Bukkit.getWorld(getWorld(resultContainer.getInt("wid"))), resultContainer.getInt("x"), resultContainer.getInt("y"), resultContainer.getInt("z"));
+                    RestoreWorld.getInstance().containerDataManager.addLocationData(location, meta, getMaterial(type));
+                } catch (Exception e) {
+                    System.out.println("Тута чета да");
+                }
+            }
+            System.out.println("Выводим содержимое контейнер базы");
+            for (ContainerData containerData : RestoreWorld.getInstance().containerDataManager.getContainerDataList()) {
+                System.out.println("Содержимое контейнер базы: " + containerData.getMaterial() + " " + containerData.getMeta() + " " + containerData.getLocation());
+            }
+        } catch (Exception e) {
+            RestoreWorld.getInstance().getLogger().warning("EXCEPTION GET CONTAINER!");
+            e.printStackTrace();
+        }
     }
 
     public void setBlock(){
-        if (!isFinishedQuery) {
-            RestoreWorld.getInstance().getLogger().info("Ожидание окончание работы бд, шаг " + currentStep);
-            return;
-        }
-        RestoreWorld.getInstance().getLogger().info("Blocks added: " + BlockDataManager.count);
-        if (isStartedSetBlock) {
-            return;
-        }
-        isStartedSetBlock = true;
         RestoreWorld.getInstance().getLogger().info("Запуск установки блоков");
         // int i = 0; // раскомитить если асинхронно
         Iterator<BlockData> iterator = RestoreWorld.getInstance().blockDataManager.getLocationDataList().iterator();
@@ -161,24 +207,32 @@ public class DataBase {
             System.out.println("Finish! шаг " + currentStep);
             startAsyncQuery();
         }
-        if (isFinishedStep) {
-            asyncSetBlock.cancel();     // если мы все шаги прошли, то стопаем запуск треда
-        }
-        isStartedSetBlock = false;
     }
 
     public void setItemContainer() {
         // Мы должны брать сундук с актион 1, т.к. это значит, что в сундуке что-то есть
         // Так же, мы должны сортировать контейнера по времени и параметрам wid, x, y, z, type, где type выступает содержимым контейнера (amount кол-во этого предмета)
         // То есть могут быть 10 одинаковых координат, но иметь разное содержимое
-        if (!isFinishedSetAllBlock) {
-            System.out.println("Ждем установки всех блоков");
-            return;
+        System.out.println("Установка контейнеров");
+        Iterator<ContainerData> iterator = RestoreWorld.getInstance().containerDataManager.getContainerDataList().iterator();
+        while (!RestoreWorld.getInstance().containerDataManager.getContainerDataList().isEmpty()) {
+            ContainerData containerData = iterator.next();
+            try {
+                Location locationData = containerData.getLocation();
+                try {
+                    locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(containerData.getMaterial() + "[" + containerData.getMeta() + "]"));
+                } catch (Exception e) {
+                    RestoreWorld.getInstance().getLogger().info("Установка блока который не имеет BlockData");
+                    locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(containerData.getMaterial()));
+                }
+                System.out.println(containerData.getMaterial() + " " + locationData);
+                iterator.remove();
+            } catch (Exception e) {
+                iterator.remove();
+                RestoreWorld.getInstance().getLogger().warning("EXCEPTION!EXCEPTION!EXCEPTION!");
+            }
         }
-        if (isStartedSetItem) {
-            return;
-        }
-        isStartedSetItem = true;
+        System.out.println("Все контейнера были установлены");
         String query = "SELECT * " +
                 "FROM co_container " +
                 "WHERE action = 1 " +
@@ -200,6 +254,7 @@ public class DataBase {
                 int z = result.getInt("z");
                 Location location = new Location(Bukkit.getWorld(getWorld(wid)), x ,y ,z);
                 Material blockMaterialContainer = location.getBlock().getType();
+                System.out.println(blockMaterialContainer);
                 try {
                     switch (blockMaterialContainer) {
                         case CHEST, TRAPPED_CHEST -> {
@@ -238,7 +293,6 @@ public class DataBase {
             RestoreWorld.getInstance().getLogger().warning("EXCEPTION CONTAINER!");
         }
         System.out.println("FINALLY FINISH!");
-        asyncSetItem.cancel();
     }
 
     public ItemStack getItem(Material material, int amount) {
@@ -271,7 +325,6 @@ public class DataBase {
         return null;
     }
 
-
     public String getBlockData(int id){
         try(final PreparedStatement stmt = this.con.prepareStatement("SELECT * FROM co_blockdata_map WHERE id = ?")) {
             stmt.setInt(1, id);
@@ -282,5 +335,40 @@ public class DataBase {
             e.printStackTrace();
         }
         return null;
+    }
+
+    public void getContainerMaterial() {
+        System.out.println("Хэшируем материалы контейнера");
+        HashMap<String, Integer> hashMaterialContainer = new HashMap<>();
+        String query = "SELECT id, material FROM co_material_map";
+        try (final PreparedStatement statement = con.prepareStatement(query)) {
+            ResultSet result = statement.executeQuery();
+            while (result.next()) {
+                int id = result.getInt("id");
+                String material = result.getString("material");
+                // Получаем материалы
+                if (material.equals("minecraft:chest") ||
+                        material.equals("minecraft:trapped_chest") ||
+                        material.equals("minecraft:barrel") ||
+                        material.equals("minecraft:dispenser") ||
+                        material.equals("minecraft:dropper") ||
+                        material.equals("minecraft:hopper")) {
+                    System.out.println(material);
+                    hashMaterialContainer.put(material, id);
+                }
+            }
+            // Проходим по всем элементам хэш мапы и добавляем их в строку
+            for (HashMap.Entry<String, Integer> entry : hashMaterialContainer.entrySet()) {
+                if (stringMaterialID.length() > 0) {
+                    stringMaterialID.append(",");
+                }
+                stringMaterialID.append(entry.getValue());
+            }
+            for (ContainerData containerData : RestoreWorld.getInstance().containerDataManager.getContainerDataList()) {
+                System.out.println(containerData.getMaterial());
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
