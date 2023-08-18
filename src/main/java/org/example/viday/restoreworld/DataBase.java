@@ -16,22 +16,23 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
+import java.util.*;
 
 public class DataBase {
     public static HikariDataSource hds;
     public Connection con;
     private long count = 0;
     StringBuilder stringMaterialID = new StringBuilder();
-    private long minTimeMS = 1692032400;     // МЕНЯТЬ старт по времени (тут у нас указывается минимальное значение отсчета) пример: 1.08.2023
-    private long maxTimeMS = 1699032400;     // МЕНЯТЬ максимальный по времени шаг (тут указывается максимальное значение времени) пример: 8.08.2023
-    private final int amountStepMS = 604800000;   // размер шага в ms (указанное значение это 7 дней)
-    private final int maxStep = 8;  // кол-во шагов
+    private String stringMaterialIDNotHopper = "";
+    private String hopperIDMaterial = "";
+    private HashMap<Integer, String> hashMaterials = new HashMap<>();
+    private HashMap<Integer, String> hashMetaBlock = new HashMap<>();
+    private long minTimeMS = 1691859600;     // МЕНЯТЬ старт по времени (тут у нас указывается минимальное значение отсчета) пример: 1.08.2023
+    private long maxTimeMS = 1691946000;     // МЕНЯТЬ максимальный по времени шаг (тут указывается максимальное значение времени) пример: 8.08.2023
+    private final int amountStepMS = 86400;   // размер шага в ms (указанное значение это 7 дней - 604800000)
+    private final int maxStep = 1692378000 / amountStepMS;  // кол-во шагов
     private int currentStep = 0;    // кол-во текущих шагов (для конфига и тайм стопа)
-    private final long maxTimeStepMS = 1791790003; // максимум по времени до которого мы можем дойти (11 августа - 1691790003)
+    private final long maxTimeStepMS = 1692378000; // максимум по времени до которого мы можем дойти (11 августа - 1691790003)
 
 
     public DataBase(HikariConfig config) {
@@ -47,10 +48,10 @@ public class DataBase {
     }
 
     private void startAsyncQuery() {
-        if (currentStep < maxStep) {
+        if (currentStep < maxStep + 1) {    // +1 ибо деление НЕ на цело может в конечном итоге не дойти до максимального порога времени
             if (currentStep != 0) {
                 minTimeMS += amountStepMS;      // 0 + 7 = 7
-                maxTimeMS = minTimeMS + maxStep;// 7 + 7 = 14 (для соблюдения интервала)
+                maxTimeMS = minTimeMS + amountStepMS;// 7 + 7 = 14 (для соблюдения интервала)
             }
             if (maxTimeMS > maxTimeStepMS) {
                 maxTimeMS = maxTimeStepMS;  // если мы превышаем максимальное значение, то присваиваем максимальное
@@ -58,13 +59,11 @@ public class DataBase {
             if (minTimeMS > maxTimeStepMS) {
                 minTimeMS = maxTimeStepMS;  // тоже самое что и выше
             }
-            // типо работает, наверное, но почему то превышаю лимит, мб данных мало
-            /*if (minTimeMS == maxTimeStepMS && maxTimeMS == maxTimeStepMS) {
+            // типо работает, наверное, но почему-то превышаю лимит, мб данных мало
+            if (minTimeMS == maxTimeStepMS && maxTimeMS == maxTimeStepMS) {
                 currentStep = maxStep;
-                isFinishedStep = true;
-                isFinishedSetAllBlock = true;
                 System.out.println("FINISH! (Кол-во шагов превышают максимальный лимит по времени)");
-            }*/
+            }
             currentStep++;
         }
         else {
@@ -85,11 +84,13 @@ public class DataBase {
                     "AND t2.max_time < " + maxTimeMS + " " +
                     "AND t1.time > " + minTimeMS + " " +
                     "AND t2.max_time > " + minTimeMS + " " +
-                    "WHERE t1.type NOT IN (" + stringMaterialID + ")";
+                    "WHERE t1.type NOT IN (" + stringMaterialIDNotHopper + ") " +
+                    "OR (t1.type = " + hopperIDMaterial + " AND t1.blockdata IS NOT NULL) " +
+                    "AND t1.action >= 1";
 
             //String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time AND t1.time < 1691790003 AND t2.max_time < 1691790003 AND t1.time > 1691096400 AND t2.max_time > 1691096400;";
             //String query = "SELECT t1.* FROM co_block t1 JOIN (SELECT wid, x, y, z, MAX(time) AS max_time FROM co_block WHERE rolled_back = 0 GROUP BY wid, x, y, z) t2 ON t1.wid = t2.wid AND t1.x = t2.x AND t1.y = t2.y AND t1.z = t2.z AND t1.time = t2.max_time";
-            PreparedStatement stmt = con.prepareStatement(query);
+            final PreparedStatement stmt = con.prepareStatement(query);
             ResultSet result = stmt.executeQuery();
             RestoreWorld.getInstance().getLogger().info("Получили данные!");
             while (result.next()) {
@@ -104,7 +105,7 @@ public class DataBase {
                     meta = String.join(",", data);
                 }
                 // Обработка результатов
-                Location loc = new Location(Bukkit.getWorld(RestoreWorld.getInstance().dataBase.getWorld(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
+                Location loc = new Location(Bukkit.getWorld(getWorld(result.getInt("wid"))), result.getInt("x"), result.getInt("y"), result.getInt("z"));
                 int type = result.getInt("type");
                 int action = result.getInt("action");
                 int time = result.getInt("time");
@@ -119,12 +120,17 @@ public class DataBase {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        getContainerBlock();    // получаем контейнера
         // Удаление контейнеров если они более не актуальны
         System.out.println("Удаление не актуальных контейнеров");
         for (BlockData blockData : RestoreWorld.getInstance().blockDataManager.getLocationDataList()) {
             for (ContainerData containerData : RestoreWorld.getInstance().containerDataManager.getContainerDataList()) {
-                if (blockData.getLocation().equals(containerData.getLocation())) {
-                    System.out.println("Совпадение по Location: " + blockData.getLocation());
+                if (blockData.getLocation().equals(containerData.getLocation()) && blockData.getMeta().length() < containerData.getMeta().length() && blockData.getMaterial().equals(containerData.getMaterial())) {
+                    System.out.println("Удаления блока из блок даты, т.к. есть контейнер, имеющий поворот");
+                    RestoreWorld.getInstance().blockDataManager.removeBlockData(containerData.getLocation(), containerData.getMeta(), containerData.getMaterial(), blockData.getTime());
+                }
+                else if (blockData.getLocation().equals(containerData.getLocation()) && !blockData.getMaterial().equals(containerData.getMaterial())) {
+                    System.out.println("Удаление контейнера, т.к. он был заменен другим блоком");
                     RestoreWorld.getInstance().containerDataManager.removeContainerData(containerData.getLocation(), containerData.getMeta(), containerData.getMaterial());
                 }
             }
@@ -144,11 +150,14 @@ public class DataBase {
                     "AND t1.y = t2.y " +
                     "AND t1.z = t2.z " +
                     "AND t1.time = t2.max_time " +
-                    "AND t1.time < " + maxTimeStepMS + " " +
-                    "AND t2.max_time < " + maxTimeStepMS + " " +
+                    "AND t1.time < " + maxTimeMS + " " +
+                    "AND t2.max_time < " + maxTimeMS + " " +
+                    "AND t1.time > " + minTimeMS + " " +
+                    "AND t2.max_time > " + minTimeMS + " " +
                     "WHERE t1.type IN (" + stringMaterialID + ")";
             PreparedStatement statementContainer = con.prepareStatement(queryContainer);
             ResultSet resultContainer = statementContainer.executeQuery();
+            System.out.println("Запуск добавления контейнеров");
             while (resultContainer.next()) {
                 try {
                     resultContainer.getString("blockdata").split(",");
@@ -162,13 +171,14 @@ public class DataBase {
                     Location location = new Location(Bukkit.getWorld(getWorld(resultContainer.getInt("wid"))), resultContainer.getInt("x"), resultContainer.getInt("y"), resultContainer.getInt("z"));
                     RestoreWorld.getInstance().containerDataManager.addLocationData(location, meta, getMaterial(type));
                 } catch (Exception e) {
-                    System.out.println("Тута чета да");
+                    RestoreWorld.getInstance().getLogger().warning("Проблема с получением состояния блоков");
                 }
             }
-            System.out.println("Выводим содержимое контейнер базы");
+            System.out.println("Контейнера добавлены");
+            /*System.out.println("Выводим содержимое контейнер базы");
             for (ContainerData containerData : RestoreWorld.getInstance().containerDataManager.getContainerDataList()) {
                 System.out.println("Содержимое контейнер базы: " + containerData.getMaterial() + " " + containerData.getMeta() + " " + containerData.getLocation());
-            }
+            }*/
         } catch (Exception e) {
             RestoreWorld.getInstance().getLogger().warning("EXCEPTION GET CONTAINER!");
             e.printStackTrace();
@@ -177,10 +187,8 @@ public class DataBase {
 
     public void setBlock(){
         RestoreWorld.getInstance().getLogger().info("Запуск установки блоков");
-        // int i = 0; // раскомитить если асинхронно
         Iterator<BlockData> iterator = RestoreWorld.getInstance().blockDataManager.getLocationDataList().iterator();
-        while (!RestoreWorld.getInstance().blockDataManager.getLocationDataList().isEmpty() /*&& i < 500*/) {
-            // i++;
+        while (!RestoreWorld.getInstance().blockDataManager.getLocationDataList().isEmpty()) {
             BlockData blockData = iterator.next();
             try {
                 Location locationData = blockData.getLocation();
@@ -225,7 +233,6 @@ public class DataBase {
                     RestoreWorld.getInstance().getLogger().info("Установка блока который не имеет BlockData");
                     locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(containerData.getMaterial()));
                 }
-                System.out.println(containerData.getMaterial() + " " + locationData);
                 iterator.remove();
             } catch (Exception e) {
                 iterator.remove();
@@ -233,6 +240,7 @@ public class DataBase {
             }
         }
         System.out.println("Все контейнера были установлены");
+        System.out.println("Запуск добавление вещей в контейнера");
         String query = "SELECT * " +
                 "FROM co_container " +
                 "WHERE action = 1 " +
@@ -254,7 +262,6 @@ public class DataBase {
                 int z = result.getInt("z");
                 Location location = new Location(Bukkit.getWorld(getWorld(wid)), x ,y ,z);
                 Material blockMaterialContainer = location.getBlock().getType();
-                System.out.println(blockMaterialContainer);
                 try {
                     switch (blockMaterialContainer) {
                         case CHEST, TRAPPED_CHEST -> {
@@ -289,6 +296,7 @@ public class DataBase {
                     e.printStackTrace();
                 }
             }
+            System.out.println("Успешно добавили в контейнера реси");
         } catch (Exception e) {
             RestoreWorld.getInstance().getLogger().warning("EXCEPTION CONTAINER!");
         }
@@ -339,6 +347,7 @@ public class DataBase {
 
     public void getContainerMaterial() {
         System.out.println("Хэшируем материалы контейнера");
+        // TODO 100% можно сделать лучше
         HashMap<String, Integer> hashMaterialContainer = new HashMap<>();
         String query = "SELECT id, material FROM co_material_map";
         try (final PreparedStatement statement = con.prepareStatement(query)) {
@@ -356,6 +365,9 @@ public class DataBase {
                     System.out.println(material);
                     hashMaterialContainer.put(material, id);
                 }
+                if (material.equals("minecraft:hopper")) {
+                    hopperIDMaterial = String.valueOf(id);
+                }
             }
             // Проходим по всем элементам хэш мапы и добавляем их в строку
             for (HashMap.Entry<String, Integer> entry : hashMaterialContainer.entrySet()) {
@@ -364,9 +376,20 @@ public class DataBase {
                 }
                 stringMaterialID.append(entry.getValue());
             }
-            for (ContainerData containerData : RestoreWorld.getInstance().containerDataManager.getContainerDataList()) {
-                System.out.println(containerData.getMaterial());
+
+            // Разделяем строку на массив строк по запятым (нужно для строки без id хопера)
+            String[] parts = String.valueOf(stringMaterialID).split(",");
+            List<String> modifiedParts = new ArrayList<>();
+            for (String part : parts) {
+                int num = Integer.parseInt(part);
+                if (num != hashMaterialContainer.get("minecraft:hopper")) {
+                    modifiedParts.add(part);
+                }
             }
+            // Объединяем подстроки обратно в строку с использованием запятых
+            stringMaterialIDNotHopper = String.join(",", modifiedParts);
+
+            System.out.println("Хеширование завершено");
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }

@@ -13,7 +13,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class RestoreWorld extends JavaPlugin {
-    public DataBase dataBase;
     public Store store;
     private static RestoreWorld instance;
     public BlockDataManager blockDataManager;
@@ -29,7 +28,7 @@ public final class RestoreWorld extends JavaPlugin {
         blockDataManager = new BlockDataManager();
         containerDataManager = new ContainerDataManager();
         config.setJdbcUrl("jdbc:sqlite:" + getDataFolder() + "/database.db");
-        dataBase = new DataBase(config);
+        new DataBase(config);
     }
 
     @Override
