@@ -27,12 +27,13 @@ public class DataBase {
     private String hopperIDMaterial = "";
     private HashMap<Integer, String> hashMaterials = new HashMap<>();
     private HashMap<Integer, String> hashMetaBlock = new HashMap<>();
-    private long minTimeMS = 1691859600;     // МЕНЯТЬ старт по времени (тут у нас указывается минимальное значение отсчета) пример: 1.08.2023
-    private long maxTimeMS = 1691946000;     // МЕНЯТЬ максимальный по времени шаг (тут указывается максимальное значение времени) пример: 8.08.2023
-    private final int amountStepMS = 86400;   // размер шага в ms (указанное значение это 7 дней - 604800000)
-    private final int maxStep = 1692378000 / amountStepMS;  // кол-во шагов
+    private boolean isStartTimer = false;
+    private long minTimeMS = 1690477200;     // МЕНЯТЬ старт по времени (тут у нас указывается минимальное значение отсчета) пример: 1.08.2023
+    private long maxTimeMS = 1690563600;     // МЕНЯТЬ максимальный по времени шаг (тут указывается максимальное значение времени) пример: 8.08.2023
+    private final int amountStepMS = 86400;   // размер шага в ms (указанное значение это 7 дней - 604800)
+    private final int maxStep = 1691790003 / amountStepMS;  // кол-во шагов
     private int currentStep = 0;    // кол-во текущих шагов (для конфига и тайм стопа)
-    private final long maxTimeStepMS = 1692378000; // максимум по времени до которого мы можем дойти (11 августа - 1691790003)
+    private final long maxTimeStepMS = 1691790003; // максимум по времени до которого мы можем дойти (11 августа - 1691790003)
 
 
     public DataBase(HikariConfig config) {
@@ -42,6 +43,8 @@ public class DataBase {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
+        timerSendMessage();
+
         getContainerMaterial(); // Сундуки, хоперы и т.д.
         getContainerBlock();    // после мы вносим корды и состояние контейнеров
         startAsyncQuery();
@@ -64,9 +67,11 @@ public class DataBase {
                 currentStep = maxStep;
                 System.out.println("FINISH! (Кол-во шагов превышают максимальный лимит по времени)");
             }
+            isStartTimer = false;
             currentStep++;
         }
         else {
+            isStartTimer = false;
             setItemContainer();
             return;
         }
@@ -123,7 +128,8 @@ public class DataBase {
         getContainerBlock();    // получаем контейнера
         // Удаление контейнеров если они более не актуальны
         System.out.println("Удаление не актуальных контейнеров");
-        for (BlockData blockData : RestoreWorld.getInstance().blockDataManager.getLocationDataList()) {
+        // удалить код ниже, если все работает
+        /*for (BlockData blockData : RestoreWorld.getInstance().blockDataManager.getLocationDataList()) {
             for (ContainerData containerData : RestoreWorld.getInstance().containerDataManager.getContainerDataList()) {
                 if (blockData.getLocation().equals(containerData.getLocation()) && blockData.getMeta().length() < containerData.getMeta().length() && blockData.getMaterial().equals(containerData.getMaterial())) {
                     System.out.println("Удаления блока из блок даты, т.к. есть контейнер, имеющий поворот");
@@ -134,7 +140,23 @@ public class DataBase {
                     RestoreWorld.getInstance().containerDataManager.removeContainerData(containerData.getLocation(), containerData.getMeta(), containerData.getMaterial());
                 }
             }
+        }*/
+        Iterator<BlockData> blockIterator = RestoreWorld.getInstance().blockDataManager.getLocationDataList().iterator();
+        while (blockIterator.hasNext()) {
+            BlockData blockData = blockIterator.next();
+            Iterator<ContainerData> containerIterator = RestoreWorld.getInstance().containerDataManager.getContainerDataList().iterator();
+            while (containerIterator.hasNext()) {
+                ContainerData containerData = containerIterator.next();
+                if (blockData.getLocation().equals(containerData.getLocation()) && blockData.getMeta().length() < containerData.getMeta().length() && blockData.getMaterial().equals(containerData.getMaterial())) {
+                    System.out.println("Удаления блока из блок даты, т.к. есть контейнер, имеющий поворот");
+                    blockIterator.remove();
+                } else if (blockData.getLocation().equals(containerData.getLocation()) && !blockData.getMaterial().equals(containerData.getMaterial())) {
+                    System.out.println("Удаление контейнера, т.к. он был заменен другим блоком");
+                    containerIterator.remove();
+                }
+            }
         }
+        isStartTimer = true;
         setBlock();
     }
     public void getContainerBlock() {
@@ -198,12 +220,6 @@ public class DataBase {
                     RestoreWorld.getInstance().getLogger().info("Установка блока который не имеет BlockData");
                     locationData.getBlock().setBlockData(RestoreWorld.getInstance().getServer().createBlockData(blockData.getMaterial()));
                 }
-                RestoreWorld.getInstance().getLogger().info("[" + new SimpleDateFormat("dd MMM yyyy HH:mm:ss").format(new Date(Long.parseLong( blockData.getTime() + "000"))) + "] " +
-                        "шаг " + currentStep + " [" + Math.round(( ((double) count / 62_000_000) * 100 ) * 1e10) / 1e10 + "%] " +
-                        blockData.getMaterial() + " " +
-                        blockData.getLocation().getBlockX() + " " +
-                        blockData.getLocation().getBlockY() + " " +
-                        blockData.getLocation().getBlockZ());
                 count++;
                 iterator.remove();
             } catch (Exception e) {
@@ -247,7 +263,8 @@ public class DataBase {
                 "AND (wid, x, y, z, type, time) IN (" +
                 "SELECT wid, x, y, z, type, MAX(time) AS max_time " +
                 "FROM co_container " +
-                "WHERE action = 1 AND time < " + maxTimeStepMS + " " +
+                "WHERE action = 1 " +
+                "AND time < " + maxTimeStepMS + " " +
                 "GROUP BY wid, x, y, z, type " +
                 ")";
         try {
@@ -300,6 +317,7 @@ public class DataBase {
         } catch (Exception e) {
             RestoreWorld.getInstance().getLogger().warning("EXCEPTION CONTAINER!");
         }
+        isStartTimer = false;
         System.out.println("FINALLY FINISH!");
     }
 
@@ -393,5 +411,23 @@ public class DataBase {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void timerSendMessage() {
+        Thread asyncThread = new Thread(() -> {
+            System.out.println("Запуск таймера ожидания (заработает, когда будет установка блоков)");
+            while (!Thread.interrupted()) {
+                try {
+                    if (isStartTimer) {
+                        RestoreWorld.getInstance().getLogger().info("шаг " + currentStep + " [" + Math.round(( ((double) count / 62_000_000) * 100 ) * 1e10) / 1e10 + "%] ");
+                    }
+                    Thread.sleep(1000); // Пауза на 1 секунду
+                } catch (InterruptedException e) {
+                    // Обработка исключения
+                    Thread.currentThread().interrupt(); // Установка флага прерывания
+                }
+            }
+        });
+        asyncThread.start(); // Запуск потока
     }
 }
