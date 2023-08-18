@@ -141,7 +141,7 @@ public class DataBase {
                 }
             }
         }*/
-        Iterator<BlockData> blockIterator = RestoreWorld.getInstance().blockDataManager.getLocationDataList().iterator();
+        /*Iterator<BlockData> blockIterator = RestoreWorld.getInstance().blockDataManager.getLocationDataList().iterator();
         while (blockIterator.hasNext()) {
             BlockData blockData = blockIterator.next();
             Iterator<ContainerData> containerIterator = RestoreWorld.getInstance().containerDataManager.getContainerDataList().iterator();
@@ -155,7 +155,29 @@ public class DataBase {
                     containerIterator.remove();
                 }
             }
+        }*/
+        List<BlockData> blocksToRemove = new ArrayList<>();
+        List<ContainerData> containersToRemove = new ArrayList<>();
+        for (BlockData blockData : RestoreWorld.getInstance().blockDataManager.getLocationDataList()) {
+            for (ContainerData containerData : RestoreWorld.getInstance().containerDataManager.getContainerDataList()) {
+                if (blockData.getLocation().equals(containerData.getLocation()) && blockData.getMeta().length() < containerData.getMeta().length() && blockData.getMaterial().equals(containerData.getMaterial())) {
+                    System.out.println("Удаления блока из блок даты, т.к. есть контейнер, имеющий поворот");
+                    blocksToRemove.add(blockData);
+                } else if (blockData.getLocation().equals(containerData.getLocation()) && !blockData.getMaterial().equals(containerData.getMaterial())) {
+                    System.out.println("Удаление контейнера, т.к. он был заменен другим блоком");
+                    containersToRemove.add(containerData);
+                }
+            }
         }
+        System.out.println("Удаление после итерации");  // Классическое удаление через итераторы сыпет эксепшены
+        // Удаление объектов после итерации
+        for (BlockData blockData : blocksToRemove) {
+            RestoreWorld.getInstance().blockDataManager.removeBlockData(blockData.getLocation(), blockData.getMeta(), blockData.getMaterial(), blockData.getTime());
+        }
+        for (ContainerData containerData : containersToRemove) {
+            RestoreWorld.getInstance().containerDataManager.removeContainerData(containerData.getLocation(), containerData.getMeta(), containerData.getMaterial());
+        }
+        System.out.println("Удаление завершено");
         isStartTimer = true;
         setBlock();
     }
